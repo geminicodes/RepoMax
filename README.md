@@ -50,9 +50,43 @@ npm run dev
 
 ## Tone detection (Google Cloud Natural Language)
 
-- **Endpoint**: `POST /api/v1/analyze` with `{ jobUrl, description }` returns a `ToneAnalysis` object.
+- **Endpoint**: `POST /api/v1/analyze` returns a `ToneAnalysis` object (auth required).
 - **Caching**: in-memory LRU+TTL (default **24h**) to target ~60–80% hit rate.
 - **Language**: heuristic `en`/`es` detection; NL sentiment/entities run for both; text classification runs for `en` when supported.
+
+## Authentication + persistence (Firebase Auth + Firestore)
+
+- **Auth**: client signs in (email/password or Google OAuth) → obtains Firebase ID token → sends `Authorization: Bearer <token>` to the API.
+- **Server verification**: Admin SDK verifies the token, loads the user tier from Firestore, and attaches `req.user = { uid, email, tier }`.
+- **Tiers**
+  - **free**: 3 analyses/month, **no history stored**
+  - **pro**: unlimited, analysis + README history stored
+
+### Frontend integration (example)
+
+```ts
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+
+const app = initializeApp({ apiKey, authDomain, projectId });
+const auth = getAuth(app);
+
+const cred = await signInWithEmailAndPassword(auth, email, password);
+const idToken = await cred.user.getIdToken();
+
+await fetch("/api/v1/analyze", {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    Authorization: `Bearer ${idToken}`
+  },
+  body: JSON.stringify({ githubUsername, jobUrl, jobTitle, description })
+});
+```
+
+### Firestore rules
+
+This repo includes `firestore.rules` with per-user read access to `users`, `analyses`, and `readmes`.
 
 ## Google Cloud setup (required services)
 
@@ -85,6 +119,7 @@ Also set:
    - `GOOGLE_APPLICATION_CREDENTIALS=...` OR `GCP_SERVICE_ACCOUNT_JSON=...`
 5) Set:
    - `FIREBASE_PROJECT_ID=your-firebase-project-id`
+   - `FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account", ...}'` (recommended for server auth + Firestore)
 
 **Planned collections**
 - `users`: user profiles + preferences

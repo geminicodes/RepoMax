@@ -23,6 +23,7 @@ const envSchema = zod_1.z.object({
     GCP_PROJECT_ID: zod_1.z.string().min(1).optional(),
     GOOGLE_CLOUD_PROJECT_ID: zod_1.z.string().min(1).optional(),
     FIREBASE_PROJECT_ID: zod_1.z.string().min(1).optional(),
+    FIREBASE_SERVICE_ACCOUNT_JSON: zod_1.z.string().min(2).optional(),
     GOOGLE_APPLICATION_CREDENTIALS: zod_1.z.string().min(1).optional(),
     GCP_SERVICE_ACCOUNT_JSON: zod_1.z.string().min(1).optional(),
     GOOGLE_CLOUD_CREDENTIALS_JSON: zod_1.z.string().min(2).optional(),
