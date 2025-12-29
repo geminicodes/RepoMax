@@ -48,6 +48,12 @@ npm run dev
 - **Endpoint**: `POST /api/generate-readme` (alias of `POST /api/v1/generate-readme`)
 - **UI**: open the client at `http://localhost:5173` and use the README Generator screen.
 
+## Tone detection (Google Cloud Natural Language)
+
+- **Endpoint**: `POST /api/v1/analyze` with `{ jobUrl, description }` returns a `ToneAnalysis` object.
+- **Caching**: in-memory LRU+TTL (default **24h**) to target ~60–80% hit rate.
+- **Language**: heuristic `en`/`es` detection; NL sentiment/entities run for both; text classification runs for `en` when supported.
+
 ## Google Cloud setup (required services)
 
 ### Gemini API key (AI Studio)
