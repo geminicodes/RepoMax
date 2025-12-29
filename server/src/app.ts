@@ -19,6 +19,7 @@ export function createApp() {
   const app = express();
 
   app.set("trust proxy", 1);
+  app.set("logger", logger);
 
   app.use(pinoHttp({ logger }));
   app.use(requestTimeout());
