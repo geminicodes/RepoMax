@@ -43,6 +43,11 @@ npm run dev
 - Client: `http://localhost:5173`
 - Server: `http://localhost:8080/api/health`
 
+## Generate an improved README (copy/paste ready)
+
+- **Endpoint**: `POST /api/generate-readme` (alias of `POST /api/v1/generate-readme`)
+- **UI**: open the client at `http://localhost:5173` and use the README Generator screen.
+
 ## Google Cloud setup (required services)
 
 ### Gemini API key (AI Studio)
