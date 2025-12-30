@@ -6,9 +6,16 @@ import { ArrowLeft, Github, Link as LinkIcon, Sparkles, Shield, Clock, Zap } fro
 import { Button } from '@/components/ui/button';
 import { AnalysisLoading } from '@/components/analysis/AnalysisLoading';
 import { toast } from '@/hooks/use-toast';
+import { RateLimitBanner } from '@/components/shared/RateLimitBanner';
+import { useAuth } from '@/contexts/AuthContext';
+import { useRateLimit, emitUsageUpdate } from '@/hooks/use-rate-limit';
+import { incrementAnalysisUsage } from '@/lib/rateLimit';
+import { trackEvent } from '@/config/firebase';
 
 const AnalyzePage = () => {
   const navigate = useNavigate();
+  const { user, tier } = useAuth();
+  const { snapshot } = useRateLimit();
   const [username, setUsername] = useState('');
   const [jobUrl, setJobUrl] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -45,10 +52,27 @@ const AnalyzePage = () => {
     if (!validateForm()) {
       return;
     }
+
+    if (tier === "free" && (snapshot.remaining ?? 0) <= 0) {
+      toast({
+        title: "Monthly limit reached",
+        description: "Upgrade to Pro for unlimited analyses.",
+        variant: "destructive",
+      });
+      navigate("/upgrade");
+      return;
+    }
     
     setIsLoading(true);
     
     try {
+      await trackEvent("analysis_started", { uid: user?.uid ?? "anon", tier });
+
+      if (tier === "free") {
+        incrementAnalysisUsage(user?.uid ?? null);
+        emitUsageUpdate();
+      }
+
       // Simulate analysis time
       await new Promise(resolve => setTimeout(resolve, 8000));
       
@@ -75,6 +99,9 @@ const AnalyzePage = () => {
       </AnimatePresence>
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+        <div className="max-w-2xl mx-auto mb-6">
+          <RateLimitBanner />
+        </div>
         {/* Back Button */}
         <motion.div
           initial={{ opacity: 0, x: -20 }}

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Menu, X, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UserMenu } from "@/components/layout/UserMenu";
 
 const navLinks = [
   { name: "Features", href: "#features" },
@@ -39,9 +40,9 @@ export function Navbar() {
 
   const handleNavClick = (href: string) => {
     setIsMobileMenuOpen(false);
-    const element = document.querySelector(href);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth" });
+    if (href.startsWith("#")) {
+      const element = document.querySelector(href);
+      if (element) element.scrollIntoView({ behavior: "smooth" });
     }
   };
 
@@ -74,13 +75,23 @@ export function Navbar() {
             {/* Desktop Navigation */}
             <div className="hidden md:flex items-center gap-8">
               {navLinks.map((link) => (
-                <button
-                  key={link.name}
-                  onClick={() => handleNavClick(link.href)}
-                  className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
-                >
-                  {link.name}
-                </button>
+                link.isRoute ? (
+                  <Link
+                    key={link.name}
+                    to={link.href}
+                    className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
+                  >
+                    {link.name}
+                  </Link>
+                ) : (
+                  <button
+                    key={link.name}
+                    onClick={() => handleNavClick(link.href)}
+                    className="text-muted-foreground hover:text-foreground transition-colors duration-200 text-sm font-medium"
+                  >
+                    {link.name}
+                  </button>
+                )
               ))}
             </div>
 
@@ -91,6 +102,7 @@ export function Navbar() {
                   Try Free
                 </Button>
               </Link>
+              <UserMenu />
             </div>
 
             {/* Mobile Menu Button */}
@@ -127,16 +139,33 @@ export function Navbar() {
               <div className="flex flex-col h-full p-6 pt-20">
                 <nav className="flex flex-col gap-4">
                   {navLinks.map((link, index) => (
-                    <motion.button
-                      key={link.name}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.1 }}
-                      onClick={() => handleNavClick(link.href)}
-                      className="text-left text-lg font-medium text-foreground hover:text-primary transition-colors py-2 border-b border-border/50"
-                    >
-                      {link.name}
-                    </motion.button>
+                    link.isRoute ? (
+                      <motion.div
+                        key={link.name}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                      >
+                        <Link
+                          to={link.href}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className="block text-left text-lg font-medium text-foreground hover:text-primary transition-colors py-2 border-b border-border/50"
+                        >
+                          {link.name}
+                        </Link>
+                      </motion.div>
+                    ) : (
+                      <motion.button
+                        key={link.name}
+                        initial={{ opacity: 0, x: 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        onClick={() => handleNavClick(link.href)}
+                        className="text-left text-lg font-medium text-foreground hover:text-primary transition-colors py-2 border-b border-border/50"
+                      >
+                        {link.name}
+                      </motion.button>
+                    )
                   ))}
                 </nav>
                 <div className="mt-8">
@@ -145,6 +174,9 @@ export function Navbar() {
                       Try Free
                     </Button>
                   </Link>
+                </div>
+                <div className="mt-4 flex justify-center">
+                  <UserMenu />
                 </div>
               </div>
             </motion.div>

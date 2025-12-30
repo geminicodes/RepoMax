@@ -8,7 +8,7 @@ interface AnalysisContextType {
   setAnalysisResult: (result: AnalysisResult | null) => void;
   error: string | null;
   setError: (error: string | null) => void;
-  startAnalysis: (username: string, jobUrl: string) => Promise<void>;
+  startAnalysis: (username: string, jobUrl: string) => Promise<string>;
 }
 
 const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined);
@@ -18,7 +18,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const startAnalysis = async (username: string, jobUrl: string) => {
+  const startAnalysis = async (username: string, jobUrl: string): Promise<string> => {
     setIsAnalyzing(true);
     setError(null);
     
@@ -56,7 +56,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
         setAnalysisResult,
         error,
         setError,
-        startAnalysis: startAnalysis as any,
+        startAnalysis,
       }}
     >
       {children}

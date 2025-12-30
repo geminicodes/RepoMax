@@ -2,6 +2,7 @@
 // Note: Firebase auth will be integrated later - currently using mock data
 
 import { HistoryAnalysis, SavedREADME, mockHistoryData, mockREADMEData } from '@/types/history';
+import { authFetch } from '@/services/authFetch';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
@@ -9,13 +10,16 @@ const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
 const simulateDelay = (ms: number = 800) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function fetchAnalysisHistory(limit: number = 10): Promise<HistoryAnalysis[]> {
-  // TODO: Integrate Firebase auth when available
-  // const idToken = await auth.currentUser?.getIdToken();
-  // const response = await fetch(`${API_URL}/history?limit=${limit}`, {
-  //   headers: { 'Authorization': `Bearer ${idToken}` }
-  // });
-  // if (!response.ok) throw new Error('Failed to fetch history');
-  // return (await response.json()).data;
+  // Prefer API when available; fall back to mock data for local/demo environments.
+  try {
+    const response = await authFetch(`${API_URL}/history?limit=${limit}`);
+    if (response.ok) {
+      const json = await response.json();
+      return (json?.data ?? json) as HistoryAnalysis[];
+    }
+  } catch {
+    // ignore and fall back
+  }
 
   await simulateDelay();
   return mockHistoryData.slice(0, limit);
@@ -28,13 +32,15 @@ export async function fetchAnalysisById(id: string): Promise<HistoryAnalysis | n
 }
 
 export async function fetchUserREADMEs(limit: number = 20): Promise<SavedREADME[]> {
-  // TODO: Integrate Firebase auth when available
-  // const idToken = await auth.currentUser?.getIdToken();
-  // const response = await fetch(`${API_URL}/readmes?limit=${limit}`, {
-  //   headers: { 'Authorization': `Bearer ${idToken}` }
-  // });
-  // if (!response.ok) throw new Error('Failed to fetch READMEs');
-  // return (await response.json()).data;
+  try {
+    const response = await authFetch(`${API_URL}/readmes?limit=${limit}`);
+    if (response.ok) {
+      const json = await response.json();
+      return (json?.data ?? json) as SavedREADME[];
+    }
+  } catch {
+    // ignore and fall back
+  }
 
   await simulateDelay();
   return mockREADMEData.slice(0, limit);
