@@ -11,6 +11,7 @@ import {
   Area,
   AreaChart,
 } from 'recharts';
+import type { TooltipProps } from 'recharts';
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { HistoryAnalysis } from '@/types/history';
 
@@ -19,6 +20,13 @@ interface ScoreTrendChartProps {
 }
 
 export function ScoreTrendChart({ analyses }: ScoreTrendChartProps) {
+  type ChartPoint = {
+    date: string;
+    fullDate: string;
+    score: number;
+    jobTitle: string;
+  };
+
   const chartData = useMemo(() => {
     return [...analyses]
       .sort((a, b) => new Date(a.analyzedAt).getTime() - new Date(b.analyzedAt).getTime())
@@ -64,9 +72,9 @@ export function ScoreTrendChart({ analyses }: ScoreTrendChartProps) {
     );
   }
 
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload;
+  const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+    const data = (payload?.[0]?.payload ?? null) as ChartPoint | null;
+    if (active && data) {
       return (
         <div className="glass rounded-lg p-3 border border-border">
           <p className="text-sm font-medium text-foreground">{data.fullDate}</p>
