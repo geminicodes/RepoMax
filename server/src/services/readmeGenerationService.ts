@@ -1,6 +1,7 @@
-import type { GenerateReadmeRequest, GenerateReadmeResponse, GitHubRepo, JobPosting } from "@readyrepo/shared";
+import type { GenerateReadmeRequest, GenerateReadmeResponse, GitHubRepo, JobPosting, ToneAnalysis } from "@readyrepo/shared";
 import { HttpError } from "../errors/httpError";
-import { generateTextWithGemini } from "./geminiService";
+import { formatToneContextForPrompt, generateTextWithGemini } from "./geminiService";
+import { analyzeJobTone } from "./toneAnalyzer";
 
 function isSubstantialRepo(repo: GitHubRepo, readme: string | null | undefined) {
   const readmeLen = (readme ?? "").trim().length;
@@ -83,8 +84,9 @@ export function buildReadmeGenerationPrompt(params: {
   repo: GitHubRepo;
   currentReadme: string | null;
   job: JobPosting;
+  toneAnalysis?: ToneAnalysis | null;
 }) {
-  const { repo, currentReadme, job } = params;
+  const { repo, currentReadme, job, toneAnalysis } = params;
   const existing = (currentReadme ?? "").trim();
 
   const repoSummary = {
@@ -114,6 +116,7 @@ export function buildReadmeGenerationPrompt(params: {
     ``,
     `TARGET IMPACT: Make this README stand out to recruiters reviewing for "${job.title}".`,
     `Highlight skills/technologies that align with the job requirements, but only if supported by the repo data/README.`,
+    `Generate README matching: ${formatToneContextForPrompt(toneAnalysis ?? null)}`,
     ``,
     `LENGTH: Aim for 300–500 words (excluding code blocks).`,
     ``,
@@ -177,10 +180,18 @@ export async function generateEnhancedReadme(
     });
   }
 
+  let toneAnalysis: ToneAnalysis | null = null;
+  try {
+    toneAnalysis = await analyzeJobTone(input.job.description, input.job.url);
+  } catch {
+    toneAnalysis = null;
+  }
+
   const prompt = buildReadmeGenerationPrompt({
     repo: input.repo,
     currentReadme,
-    job: input.job
+    job: input.job,
+    toneAnalysis
   });
 
   const raw = await generateTextWithGemini({ prompt, temperature: 0.4 });

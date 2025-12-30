@@ -1,6 +1,13 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { getEnv } from "../config/env";
 import { HttpError } from "../errors/httpError";
+import type { ToneAnalysis } from "@readyrepo/shared";
+
+export function formatToneContextForPrompt(tone: ToneAnalysis | null | undefined) {
+  if (!tone) return "Tone analysis unavailable.";
+  const keywords = tone.culturalSignals.keywords.join(", ") || "none";
+  return `Tone ${tone.tone} (confidence ${tone.confidence}), Cultural Keywords: ${keywords}, Sentiment: ${tone.sentiment.score}`;
+}
 
 export async function generateTextWithGemini(params: {
   prompt: string;

@@ -1,9 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.formatToneContextForPrompt = formatToneContextForPrompt;
 exports.generateTextWithGemini = generateTextWithGemini;
 const generative_ai_1 = require("@google/generative-ai");
 const env_1 = require("../config/env");
 const httpError_1 = require("../errors/httpError");
+function formatToneContextForPrompt(tone) {
+    if (!tone)
+        return "Tone analysis unavailable.";
+    const keywords = tone.culturalSignals.keywords.join(", ") || "none";
+    return `Tone ${tone.tone} (confidence ${tone.confidence}), Cultural Keywords: ${keywords}, Sentiment: ${tone.sentiment.score}`;
+}
 async function generateTextWithGemini(params) {
     const env = (0, env_1.getEnv)();
     if (!env.GEMINI_API_KEY) {
