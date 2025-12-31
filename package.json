@@ -6,7 +6,7 @@
     "install:all": "npm install",
     "dev:server": "npm run dev -w server",
     "dev:client": "npm run dev -w client",
-    "dev": "npm run dev --workspaces --if-present --parallel",
+    "dev": "node scripts/dev.mjs",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client"
   },
   "devDependencies": {}
