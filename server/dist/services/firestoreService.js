@@ -41,7 +41,10 @@ async function getAnalysisById(analysisId, userId) {
     if (!snap.exists)
         return null;
     const data = snap.data();
-    if (data.userId !== userId)
+    if (!data)
+        return null;
+    const ownerId = data["userId"];
+    if (typeof ownerId !== "string" || ownerId !== userId)
         return null;
     return { id: snap.id, ...data };
 }

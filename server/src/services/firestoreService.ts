@@ -46,8 +46,10 @@ export async function getAnalysisById(analysisId: string, userId: string) {
   const db = getFirestore();
   const snap = await db.collection("analyses").doc(analysisId).get();
   if (!snap.exists) return null;
-  const data = snap.data() as any;
-  if (data.userId !== userId) return null;
+  const data = snap.data();
+  if (!data) return null;
+  const ownerId = (data as Record<string, unknown>)["userId"];
+  if (typeof ownerId !== "string" || ownerId !== userId) return null;
   return { id: snap.id, ...data };
 }
 

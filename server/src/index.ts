@@ -13,13 +13,11 @@ async function main() {
   app.listen(env.PORT, () => {
     // pino-http attaches req.log, but app-level logger isn't attached here.
     // Keep this minimal to avoid noisy startup logs.
-    // eslint-disable-next-line no-console
     console.log(`ReadyRepo server listening on :${env.PORT}`);
   });
 }
 
 main().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error("Fatal startup error:", err);
   process.exit(1);
 });

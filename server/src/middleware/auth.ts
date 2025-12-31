@@ -1,20 +1,46 @@
 import type { RequestHandler } from "express";
+import { LRUCache } from "lru-cache";
+import type { DecodedIdToken } from "firebase-admin/auth";
 import { HttpError } from "../errors/httpError";
 import { getAuth, getFirestore } from "../config/firebase";
 import { createOrUpdateUser } from "../services/userService";
 
 function parseBearerToken(header: string | undefined) {
   if (!header) return null;
-  const [scheme, token] = header.split(" ");
-  if (scheme?.toLowerCase() !== "bearer" || !token) return null;
-  return token.trim();
+  const match = /^\s*bearer\s+(.+)\s*$/i.exec(header);
+  if (!match) return null;
+  const token = match[1]?.trim();
+  if (!token) return null;
+  // Guard against absurdly large headers (basic DoS hardening).
+  if (token.length > 10_000) return null;
+  return token;
 }
 
+function getStringClaim(token: DecodedIdToken, key: string): string | null {
+  const value = (token as unknown as Record<string, unknown>)[key];
+  return typeof value === "string" ? value : null;
+}
+
+const tierCache = new LRUCache<string, "free" | "pro">({
+  max: 10_000,
+  ttl: 60_000
+});
+
+const upsertCache = new LRUCache<string, true>({
+  max: 10_000,
+  ttl: 5 * 60_000
+});
+
 async function getUserTier(uid: string): Promise<"free" | "pro"> {
+  const cached = tierCache.get(uid);
+  if (cached) return cached;
+
   const db = getFirestore();
   const snap = await db.collection("users").doc(uid).get();
   const tier = (snap.exists ? (snap.data()?.tier as string | undefined) : undefined) ?? "free";
-  return tier === "pro" ? "pro" : "free";
+  const normalized = tier === "pro" ? "pro" : "free";
+  tierCache.set(uid, normalized);
+  return normalized;
 }
 
 export const authenticateUser: RequestHandler = async (req, _res, next) => {
@@ -34,12 +60,16 @@ export const authenticateUser: RequestHandler = async (req, _res, next) => {
     const decoded = await auth.verifyIdToken(token, true);
 
     // Ensure user exists/updated in Firestore (server-trusted fields).
-    await createOrUpdateUser(
-      decoded.uid,
-      decoded.email ?? null,
-      (decoded as any).name ?? null,
-      (decoded as any).picture ?? null
-    );
+    // Cache this lightly to avoid write amplification on high-traffic APIs.
+    if (!upsertCache.get(decoded.uid)) {
+      await createOrUpdateUser(
+        decoded.uid,
+        decoded.email ?? null,
+        getStringClaim(decoded, "name"),
+        getStringClaim(decoded, "picture")
+      );
+      upsertCache.set(decoded.uid, true);
+    }
 
     const tier = await getUserTier(decoded.uid);
 
@@ -47,8 +77,8 @@ export const authenticateUser: RequestHandler = async (req, _res, next) => {
       uid: decoded.uid,
       email: decoded.email ?? null,
       tier,
-      displayName: (decoded as any).name ?? null,
-      photoURL: (decoded as any).picture ?? null
+      displayName: getStringClaim(decoded, "name"),
+      photoURL: getStringClaim(decoded, "picture")
     };
 
     req.log?.info({ uid: decoded.uid, tier }, "auth_ok");
@@ -73,20 +103,23 @@ export const optionalAuth: RequestHandler = async (req, _res, next) => {
     const auth = getAuth();
     const decoded = await auth.verifyIdToken(token, true);
 
-    await createOrUpdateUser(
-      decoded.uid,
-      decoded.email ?? null,
-      (decoded as any).name ?? null,
-      (decoded as any).picture ?? null
-    );
+    if (!upsertCache.get(decoded.uid)) {
+      await createOrUpdateUser(
+        decoded.uid,
+        decoded.email ?? null,
+        getStringClaim(decoded, "name"),
+        getStringClaim(decoded, "picture")
+      );
+      upsertCache.set(decoded.uid, true);
+    }
 
     const tier = await getUserTier(decoded.uid);
     req.user = {
       uid: decoded.uid,
       email: decoded.email ?? null,
       tier,
-      displayName: (decoded as any).name ?? null,
-      photoURL: (decoded as any).picture ?? null
+      displayName: getStringClaim(decoded, "name"),
+      photoURL: getStringClaim(decoded, "picture")
     };
 
     req.log?.info({ uid: decoded.uid, tier }, "auth_optional_ok");

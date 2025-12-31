@@ -82,7 +82,7 @@ export function readmeRouter() {
         const tone = await analyzeJobTone(input.job.description, input.job.url, req.log);
         const saved = await saveGeneratedREADME({
           userId: user.uid,
-          analysisId: (parsed.data as any).analysisId ?? null,
+          analysisId: parsed.data.analysisId ?? null,
           repoName: input.repo.name,
           repoUrl: input.repo.htmlUrl,
           originalREADME: input.currentReadme ?? input.repo.readme ?? null,

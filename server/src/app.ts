@@ -38,7 +38,7 @@ export function createApp() {
       origin:
         env.NODE_ENV === "development"
           ? true
-          : (process.env.FRONTEND_URL ?? env.CLIENT_ORIGIN),
+          : (env.FRONTEND_URL ?? env.CLIENT_ORIGIN),
       credentials: true
     })
   );

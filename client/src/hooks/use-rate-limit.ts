@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useSyncExternalStore } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAnalysisUsage, getRateLimitSnapshot } from "@/lib/rateLimit";
 
@@ -8,32 +8,36 @@ export function emitUsageUpdate() {
   window.dispatchEvent(new Event(UPDATE_EVENT));
 }
 
+function subscribeUsage(callback: () => void) {
+  window.addEventListener(UPDATE_EVENT, callback);
+  window.addEventListener("storage", callback);
+  return () => {
+    window.removeEventListener(UPDATE_EVENT, callback);
+    window.removeEventListener("storage", callback);
+  };
+}
+
 export function useRateLimit() {
   const { user, tier } = useAuth();
   const uid = user?.uid ?? null;
 
-  const [used, setUsed] = useState(() => getAnalysisUsage(uid));
+  // Keep `used` synced with localStorage without "setState in effect" patterns.
+  const used = useSyncExternalStore(
+    subscribeUsage,
+    () => getAnalysisUsage(uid),
+    () => 0,
+  );
 
+  // Preserve the existing API: callers can trigger a refresh.
   const refresh = useCallback(() => {
-    setUsed(getAnalysisUsage(uid));
-  }, [uid]);
+    emitUsageUpdate();
+  }, []);
 
-  useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  useEffect(() => {
-    const onUpdate = () => refresh();
-    window.addEventListener(UPDATE_EVENT, onUpdate);
-    window.addEventListener("storage", onUpdate);
-    return () => {
-      window.removeEventListener(UPDATE_EVENT, onUpdate);
-      window.removeEventListener("storage", onUpdate);
-    };
-  }, [refresh]);
-
-  // `used` is included so snapshot re-computes on updates, even though it re-reads localStorage internally.
-  const snapshot = useMemo(() => getRateLimitSnapshot({ uid, tier }), [uid, tier, used]);
+  // `used` is intentionally referenced to trigger recomputation when local usage changes.
+  const snapshot = useMemo(() => {
+    void used;
+    return getRateLimitSnapshot({ uid, tier });
+  }, [uid, tier, used]);
 
   return { snapshot, refresh };
 }

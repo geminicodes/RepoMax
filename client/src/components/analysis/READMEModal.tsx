@@ -38,12 +38,27 @@ export function READMEModal({
   const modalRef = useRef<HTMLDivElement>(null);
   const firstFocusableRef = useRef<HTMLButtonElement>(null);
 
+  const handleGenerate = useCallback(async () => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const readme = await onGenerate();
+      setGeneratedReadme(readme);
+    } catch {
+      setError('Failed to generate README. Please try again.');
+    } finally {
+      setIsGenerating(false);
+    }
+  }, [isGenerating, onGenerate]);
+
   // Generate README on modal open
   useEffect(() => {
-    if (isOpen && !generatedReadme && !isGenerating) {
-      handleGenerate();
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
+    if (generatedReadme) return;
+    void handleGenerate();
+  }, [generatedReadme, handleGenerate, isOpen]);
 
   // Handle ESC key
   useEffect(() => {
@@ -95,20 +110,6 @@ export function READMEModal({
     document.addEventListener('keydown', handleTabKey);
     return () => document.removeEventListener('keydown', handleTabKey);
   }, [isOpen, generatedReadme]);
-
-  const handleGenerate = async () => {
-    setIsGenerating(true);
-    setError(null);
-    
-    try {
-      const readme = await onGenerate();
-      setGeneratedReadme(readme);
-    } catch (err) {
-      setError('Failed to generate README. Please try again.');
-    } finally {
-      setIsGenerating(false);
-    }
-  };
 
   const handleCopy = useCallback(async () => {
     if (!generatedReadme) return;
