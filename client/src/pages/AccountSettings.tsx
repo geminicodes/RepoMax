@@ -29,6 +29,7 @@ import {
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { auth } from "@/config/firebase";
+import { authFetch } from "@/services/authFetch";
 import {
   deleteUser,
   sendEmailVerification,
@@ -135,12 +136,8 @@ export default function AccountSettings() {
 
   const signOutAllDevices = async () => {
     try {
-      const token = await getIdToken();
-      if (!token) throw new Error("missing-token");
-      const res = await fetch("/api/v1/auth/revoke", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const base = (import.meta.env.VITE_API_URL || "/api/v1").replace(/\/+$/, "");
+      const res = await authFetch(`${base}/auth/revoke`, { method: "POST" });
       if (!res.ok) throw new Error("not-supported");
       await signOut();
       toast({ title: "Signed out everywhere" });

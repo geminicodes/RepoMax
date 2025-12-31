@@ -9,14 +9,30 @@ import { InsightsPanel } from '@/components/analysis/InsightsPanel';
 import { RepoGrid } from '@/components/analysis/RepoGrid';
 import { FeedbackCTA } from '@/components/analysis/FeedbackCTA';
 import { FeedbackModal } from '@/components/analysis/FeedbackModal';
-import { mockAnalysisResult } from '@/types/analysis';
 import { toast } from '@/hooks/use-toast';
+import { useAnalysis } from "@/context/AnalysisContext";
 
 const ResultsPage = () => {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   
-  // Use mock data for demonstration
-  const result = mockAnalysisResult;
+  const { analysisResult: result } = useAnalysis();
+  if (!result) {
+    return (
+      <div className="min-h-screen bg-background relative">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <div className="glass rounded-2xl p-8 text-center">
+            <h1 className="font-display text-2xl font-bold mb-2">No analysis loaded</h1>
+            <p className="text-muted-foreground mb-6">
+              Run a new analysis to see results.
+            </p>
+            <Link to="/analyze">
+              <Button variant="hero">Start an analysis</Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleShare = async () => {
     try {
