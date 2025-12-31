@@ -1,7 +1,11 @@
 {
   "name": "repomax-monorepo",
   "private": true,
-  "workspaces": ["client", "server", "shared"],
+  "workspaces": [
+    "client",
+    "server",
+    "shared"
+  ],
   "scripts": {
     "install:all": "npm install",
     "dev:server": "npm run dev -w server",
@@ -9,5 +13,10 @@
     "dev": "node scripts/dev.mjs",
     "build": "npm run build -w shared && npm run build -w server && npm run build -w client"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.19",
+    "tailwindcss-animate": "^1.0.7"
+  }
 }
