@@ -88,3 +88,4 @@ async function incrementAnalysisCount(uid) {
         tx.set(ref, { analysisCount: analysisCount + 1 }, { merge: true });
     });
 }
+//# sourceMappingURL=userService.js.map

@@ -79,3 +79,4 @@ const optionalAuth = async (req, _res, next) => {
     }
 };
 exports.optionalAuth = optionalAuth;
+//# sourceMappingURL=auth.js.map

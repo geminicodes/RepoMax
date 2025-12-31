@@ -52,3 +52,4 @@ function historyRouter() {
     });
     return router;
 }
+//# sourceMappingURL=history.js.map

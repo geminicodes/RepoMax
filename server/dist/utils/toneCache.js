@@ -50,3 +50,4 @@ class ToneCache {
 exports.ToneCache = ToneCache;
 // Singleton cache for tone analysis results
 exports.toneCache = new ToneCache(1000);
+//# sourceMappingURL=toneCache.js.map
