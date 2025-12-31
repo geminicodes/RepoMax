@@ -9,6 +9,10 @@ type NlEntity = { name?: string | null; type?: string | null; salience?: number 
 
 let nlClient: LanguageServiceClient | null = null;
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return Boolean(v) && typeof v === "object" && !Array.isArray(v);
+}
+
 export function initializeNaturalLanguageClient(): LanguageServiceClient {
   if (nlClient) return nlClient;
 
@@ -22,7 +26,7 @@ export function initializeNaturalLanguageClient(): LanguageServiceClient {
     return nlClient;
   }
 
-  let creds: any;
+  let creds: unknown;
   try {
     creds = JSON.parse(raw);
   } catch {
@@ -32,13 +36,23 @@ export function initializeNaturalLanguageClient(): LanguageServiceClient {
   }
 
   // Service account JSON typically contains client_email/private_key.
-  const client_email = creds.client_email;
-  const private_key = creds.private_key;
+  const client_email =
+    isRecord(creds) && typeof creds["client_email"] === "string"
+      ? String(creds["client_email"])
+      : undefined;
+  const private_key =
+    isRecord(creds) && typeof creds["private_key"] === "string"
+      ? String(creds["private_key"])
+      : undefined;
   const credentials =
     client_email && private_key ? { client_email, private_key } : undefined;
 
   nlClient = new LanguageServiceClient({
-    projectId: projectId || creds.project_id,
+    projectId:
+      projectId ||
+      (isRecord(creds) && typeof creds["project_id"] === "string"
+        ? String(creds["project_id"])
+        : undefined),
     credentials
   });
 
@@ -70,9 +84,9 @@ function sleep(ms: number) {
 }
 
 function isRetriableError(err: unknown) {
-  const anyErr = err as any;
-  const code = anyErr?.code as number | string | undefined;
-  const message = String(anyErr?.message ?? "");
+  const e = err as { code?: unknown; message?: unknown } | null | undefined;
+  const code = (e?.code ?? undefined) as number | string | undefined;
+  const message = String(e?.message ?? "");
 
   // google-gax: codes are numeric; 429 => 8 (RESOURCE_EXHAUSTED) sometimes
   if (code === 429 || code === 8) return true;
@@ -316,13 +330,21 @@ export async function analyzeJobTone(
     })();
 
     // Categories (optional)
-    const contentCategories =
-      classifyR && classifyR.status === "fulfilled"
-        ? (classifyR.value?.[0]?.categories ?? []).map((c: any) => ({
-            name: String(c?.name ?? "").trim(),
-            confidence: Number(c?.confidence ?? 0)
-          })).filter((c) => c.name)
+    const contentCategories = (() => {
+      if (!classifyR || classifyR.status !== "fulfilled") return [];
+      const first = classifyR.value?.[0] as unknown;
+      const categoriesRaw = isRecord(first) && Array.isArray(first["categories"])
+        ? (first["categories"] as unknown[])
         : [];
+
+      return categoriesRaw
+        .map((c) => {
+          const name = isRecord(c) ? String(c["name"] ?? "").trim() : "";
+          const confidence = isRecord(c) ? Number(c["confidence"] ?? 0) : 0;
+          return { name, confidence };
+        })
+        .filter((c) => c.name);
+    })();
 
     const culture = detectCompanyCulture({
       entities: entities.map((e) => ({ name: e.name, salience: e.salience })),

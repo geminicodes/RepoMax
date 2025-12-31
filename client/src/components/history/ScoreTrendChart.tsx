@@ -19,14 +19,29 @@ interface ScoreTrendChartProps {
   analyses: HistoryAnalysis[];
 }
 
-export function ScoreTrendChart({ analyses }: ScoreTrendChartProps) {
-  type ChartPoint = {
-    date: string;
-    fullDate: string;
-    score: number;
-    jobTitle: string;
-  };
+type ChartPoint = {
+  date: string;
+  fullDate: string;
+  score: number;
+  jobTitle: string;
+};
 
+function CustomTooltip({ active, payload }: TooltipProps<number, string>) {
+  const data = (payload?.[0]?.payload ?? null) as ChartPoint | null;
+  if (!active || !data) return null;
+
+  return (
+    <div className="glass rounded-lg p-3 border border-border">
+      <p className="text-sm font-medium text-foreground">{data.fullDate}</p>
+      <p className="text-xs text-muted-foreground mt-1">{data.jobTitle}</p>
+      <p className="text-lg font-bold mt-2" style={{ color: getScoreColor(data.score) }}>
+        Score: {data.score}
+      </p>
+    </div>
+  );
+}
+
+export function ScoreTrendChart({ analyses }: ScoreTrendChartProps) {
   const chartData = useMemo(() => {
     return [...analyses]
       .sort((a, b) => new Date(a.analyzedAt).getTime() - new Date(b.analyzedAt).getTime())
@@ -71,22 +86,6 @@ export function ScoreTrendChart({ analyses }: ScoreTrendChartProps) {
       </div>
     );
   }
-
-  const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
-    const data = (payload?.[0]?.payload ?? null) as ChartPoint | null;
-    if (active && data) {
-      return (
-        <div className="glass rounded-lg p-3 border border-border">
-          <p className="text-sm font-medium text-foreground">{data.fullDate}</p>
-          <p className="text-xs text-muted-foreground mt-1">{data.jobTitle}</p>
-          <p className="text-lg font-bold mt-2" style={{ color: getScoreColor(data.score) }}>
-            Score: {data.score}
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
 
   return (
     <motion.div
@@ -150,7 +149,7 @@ export function ScoreTrendChart({ analyses }: ScoreTrendChartProps) {
               axisLine={false}
               tickFormatter={(value) => `${value}`}
             />
-            <Tooltip content={<CustomTooltip />} />
+            <Tooltip content={CustomTooltip} />
             <Area
               type="monotone"
               dataKey="score"

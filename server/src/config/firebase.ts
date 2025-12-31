@@ -3,6 +3,10 @@ import { getEnv } from "./env";
 
 let initialized = false;
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return Boolean(v) && typeof v === "object" && !Array.isArray(v);
+}
+
 export function initializeFirebase() {
   if (initialized) return;
 
@@ -19,18 +23,22 @@ export function initializeFirebase() {
     return;
   }
 
-  let parsed: any;
+  let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
   } catch {
     throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON: must be valid JSON.");
   }
 
+  if (!isRecord(parsed)) {
+    throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON: must be a JSON object.");
+  }
+
   admin.initializeApp({
-    credential: admin.credential.cert(parsed),
+    credential: admin.credential.cert(parsed as admin.ServiceAccount),
     projectId:
       env.FIREBASE_PROJECT_ID ??
-      parsed.project_id ??
+      (typeof parsed["project_id"] === "string" ? parsed["project_id"] : undefined) ??
       env.GOOGLE_CLOUD_PROJECT_ID ??
       env.GCP_PROJECT_ID
   });

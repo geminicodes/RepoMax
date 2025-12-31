@@ -535,10 +535,24 @@ const SidebarMenuSkeleton = React.forwardRef<
     showIcon?: boolean;
   }
 >(({ className, showIcon = false, ...props }, ref) => {
-  // Random width between 50 to 90%.
+  /**
+   * Deterministic skeleton width.
+   *
+   * React's purity rules (and our lint rules) disallow using impure sources
+   * like Math.random() during render, even if memoized.
+   *
+   * Using `useId()` gives us a stable per-instance seed we can hash into a
+   * repeatable "random-looking" width.
+   */
+  const id = React.useId();
   const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`;
-  }, []);
+    let hash = 0;
+    for (let i = 0; i < id.length; i += 1) {
+      hash = (hash * 31 + id.charCodeAt(i)) | 0;
+    }
+    const normalized = Math.abs(hash) % 41; // 0..40
+    return `${normalized + 50}%`; // 50..90
+  }, [id]);
 
   return (
     <div

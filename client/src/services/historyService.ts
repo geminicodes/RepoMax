@@ -4,18 +4,109 @@
 import { HistoryAnalysis, SavedREADME, mockHistoryData, mockREADMEData } from '@/types/history';
 import { authFetch } from '@/services/authFetch';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api/v1';
+const API_URL = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/+$/, '');
 
 // Simulated delay for realistic loading states
 const simulateDelay = (ms: number = 800) => new Promise(resolve => setTimeout(resolve, ms));
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return Boolean(v) && typeof v === 'object' && !Array.isArray(v);
+}
+
+function asString(v: unknown, fallback: string = ''): string {
+  return typeof v === 'string' ? v : fallback;
+}
+
+function asNumber(v: unknown, fallback: number = 0): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+}
+
+function toIsoDate(v: unknown): string {
+  if (typeof v === 'string') return v;
+  if (isRecord(v)) {
+    const seconds = v['_seconds'] ?? v['seconds'];
+    if (typeof seconds === 'number' && Number.isFinite(seconds)) {
+      return new Date(seconds * 1000).toISOString();
+    }
+  }
+  return new Date().toISOString();
+}
+
+function toHistoryAnalysis(item: unknown): HistoryAnalysis | null {
+  if (!isRecord(item)) return null;
+
+  const githubUsername = asString(item['githubUsername'], '');
+  const overallScore = asNumber(item['overallScore'], 0);
+
+  const scoreBreakdown = isRecord(item['scoreBreakdown']) ? item['scoreBreakdown'] : null;
+  const technicalScore = isRecord(scoreBreakdown) ? asNumber(scoreBreakdown['technicalSkillsMatch'], 0) : 0;
+  const experienceScore = isRecord(scoreBreakdown) ? asNumber(scoreBreakdown['experienceAlignment'], 0) : 0;
+  const relevanceScore = isRecord(scoreBreakdown) ? asNumber(scoreBreakdown['projectRelevance'], 0) : 0;
+
+  const repoScores = item['repoScores'];
+  const repoCount = Array.isArray(repoScores) ? repoScores.length : 0;
+
+  return {
+    id: asString(item['id'], ''),
+    githubUsername,
+    // Best-effort: the API doesn't currently provide avatars.
+    githubAvatar: githubUsername ? `https://github.com/${githubUsername}.png` : '',
+    jobTitle: asString(item['jobTitle'], ''),
+    // API doesn't currently expose company in a stable field.
+    jobCompany: asString(item['jobCompany'], ''),
+    overallScore,
+    technicalScore,
+    experienceScore,
+    relevanceScore,
+    analyzedAt: toIsoDate(item['createdAt'] ?? item['analyzedAt']),
+    repoCount,
+  };
+}
+
+function toSavedREADME(item: unknown): SavedREADME | null {
+  if (!isRecord(item)) return null;
+
+  const toneObj = isRecord(item['tone']) ? item['tone'] : null;
+  const tone = (isRecord(toneObj) ? toneObj['tone'] : null) as SavedREADME['tone'] | null;
+
+  const jobCtx = isRecord(item['jobContext']) ? item['jobContext'] : null;
+  const jobTitle = isRecord(jobCtx) ? asString(jobCtx['jobTitle'], '') : '';
+  const company = isRecord(jobCtx) ? asString(jobCtx['company'], '') : '';
+  const jobContext = [jobTitle, company].filter(Boolean).join(' at ') || asString(item['jobContext'], '');
+
+  return {
+    id: asString(item['id'], ''),
+    repoName: asString(item['repoName'], ''),
+    repoUrl: asString(item['repoUrl'], ''),
+    tone: (tone ?? 'corporate') as SavedREADME['tone'],
+    jobContext,
+    markdown: asString(item['generatedREADME'] ?? item['markdown'], ''),
+    generatedAt: toIsoDate(item['createdAt'] ?? item['generatedAt']),
+    analysisId: asString(item['analysisId'], ''),
+  };
+}
+
 export async function fetchAnalysisHistory(limit: number = 10): Promise<HistoryAnalysis[]> {
   // Prefer API when available; fall back to mock data for local/demo environments.
   try {
-    const response = await authFetch(`${API_URL}/history?limit=${limit}`);
+    const response = await authFetch(`${API_URL}/history`);
     if (response.ok) {
       const json = await response.json();
-      return (json?.data ?? json) as HistoryAnalysis[];
+      const maybeData = isRecord(json) ? (json['data'] as unknown) : null;
+      const analysesRaw =
+        isRecord(maybeData) && Array.isArray(maybeData['analyses'])
+          ? (maybeData['analyses'] as unknown[])
+          : Array.isArray(maybeData)
+            ? maybeData
+            : Array.isArray(json)
+              ? (json as unknown[])
+              : [];
+
+      const mapped = analysesRaw
+        .map(toHistoryAnalysis)
+        .filter((x): x is HistoryAnalysis => Boolean(x && x.id));
+
+      return mapped.slice(0, limit);
     }
   } catch {
     // ignore and fall back
@@ -26,17 +117,43 @@ export async function fetchAnalysisHistory(limit: number = 10): Promise<HistoryA
 }
 
 export async function fetchAnalysisById(id: string): Promise<HistoryAnalysis | null> {
-  // TODO: Integrate Firebase auth when available
+  // Prefer API when available; fall back to mock data for local/demo environments.
+  try {
+    const response = await authFetch(`${API_URL}/history/analysis/${encodeURIComponent(id)}`);
+    if (response.ok) {
+      const json = await response.json();
+      const maybeData = isRecord(json) ? (json['data'] as unknown) : null;
+      const analysisRaw = isRecord(maybeData) ? maybeData['analysis'] : null;
+      return toHistoryAnalysis(analysisRaw);
+    }
+  } catch {
+    // ignore and fall back
+  }
+
   await simulateDelay(500);
   return mockHistoryData.find(a => a.id === id) || null;
 }
 
 export async function fetchUserREADMEs(limit: number = 20): Promise<SavedREADME[]> {
   try {
-    const response = await authFetch(`${API_URL}/readmes?limit=${limit}`);
+    const response = await authFetch(`${API_URL}/history/readmes`);
     if (response.ok) {
       const json = await response.json();
-      return (json?.data ?? json) as SavedREADME[];
+      const maybeData = isRecord(json) ? (json['data'] as unknown) : null;
+      const readmesRaw =
+        isRecord(maybeData) && Array.isArray(maybeData['readmes'])
+          ? (maybeData['readmes'] as unknown[])
+          : Array.isArray(maybeData)
+            ? maybeData
+            : Array.isArray(json)
+              ? (json as unknown[])
+              : [];
+
+      const mapped = readmesRaw
+        .map(toSavedREADME)
+        .filter((x): x is SavedREADME => Boolean(x && x.id));
+
+      return mapped.slice(0, limit);
     }
   } catch {
     // ignore and fall back

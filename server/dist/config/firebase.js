@@ -11,6 +11,9 @@ const firebase_admin_1 = __importDefault(require("firebase-admin"));
 exports.admin = firebase_admin_1.default;
 const env_1 = require("./env");
 let initialized = false;
+function isRecord(v) {
+    return Boolean(v) && typeof v === "object" && !Array.isArray(v);
+}
 function initializeFirebase() {
     if (initialized)
         return;
@@ -32,10 +35,13 @@ function initializeFirebase() {
     catch {
         throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON: must be valid JSON.");
     }
+    if (!isRecord(parsed)) {
+        throw new Error("Invalid FIREBASE_SERVICE_ACCOUNT_JSON: must be a JSON object.");
+    }
     firebase_admin_1.default.initializeApp({
         credential: firebase_admin_1.default.credential.cert(parsed),
         projectId: env.FIREBASE_PROJECT_ID ??
-            parsed.project_id ??
+            (typeof parsed["project_id"] === "string" ? parsed["project_id"] : undefined) ??
             env.GOOGLE_CLOUD_PROJECT_ID ??
             env.GCP_PROJECT_ID
     });

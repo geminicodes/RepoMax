@@ -12,6 +12,9 @@ const language_1 = require("@google-cloud/language");
 const env_1 = require("../config/env");
 const toneCache_1 = require("../utils/toneCache");
 let nlClient = null;
+function isRecord(v) {
+    return Boolean(v) && typeof v === "object" && !Array.isArray(v);
+}
 function initializeNaturalLanguageClient() {
     if (nlClient)
         return nlClient;
@@ -33,11 +36,18 @@ function initializeNaturalLanguageClient() {
         return nlClient;
     }
     // Service account JSON typically contains client_email/private_key.
-    const client_email = creds.client_email;
-    const private_key = creds.private_key;
+    const client_email = isRecord(creds) && typeof creds["client_email"] === "string"
+        ? String(creds["client_email"])
+        : undefined;
+    const private_key = isRecord(creds) && typeof creds["private_key"] === "string"
+        ? String(creds["private_key"])
+        : undefined;
     const credentials = client_email && private_key ? { client_email, private_key } : undefined;
     nlClient = new language_1.LanguageServiceClient({
-        projectId: projectId || creds.project_id,
+        projectId: projectId ||
+            (isRecord(creds) && typeof creds["project_id"] === "string"
+                ? String(creds["project_id"])
+                : undefined),
         credentials
     });
     return nlClient;
@@ -61,9 +71,9 @@ function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
 }
 function isRetriableError(err) {
-    const anyErr = err;
-    const code = anyErr?.code;
-    const message = String(anyErr?.message ?? "");
+    const e = err;
+    const code = (e?.code ?? undefined);
+    const message = String(e?.message ?? "");
     // google-gax: codes are numeric; 429 => 8 (RESOURCE_EXHAUSTED) sometimes
     if (code === 429 || code === 8)
         return true;
@@ -255,12 +265,21 @@ async function analyzeJobTone(description, jobUrl, logger) {
             return normalizeEntities(raw);
         })();
         // Categories (optional)
-        const contentCategories = classifyR && classifyR.status === "fulfilled"
-            ? (classifyR.value?.[0]?.categories ?? []).map((c) => ({
-                name: String(c?.name ?? "").trim(),
-                confidence: Number(c?.confidence ?? 0)
-            })).filter((c) => c.name)
-            : [];
+        const contentCategories = (() => {
+            if (!classifyR || classifyR.status !== "fulfilled")
+                return [];
+            const first = classifyR.value?.[0];
+            const categoriesRaw = isRecord(first) && Array.isArray(first["categories"])
+                ? first["categories"]
+                : [];
+            return categoriesRaw
+                .map((c) => {
+                const name = isRecord(c) ? String(c["name"] ?? "").trim() : "";
+                const confidence = isRecord(c) ? Number(c["confidence"] ?? 0) : 0;
+                return { name, confidence };
+            })
+                .filter((c) => c.name);
+        })();
         const culture = detectCompanyCulture({
             entities: entities.map((e) => ({ name: e.name, salience: e.salience })),
             sentiment

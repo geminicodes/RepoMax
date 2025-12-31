@@ -1,22 +1,46 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.optionalAuth = exports.authenticateUser = void 0;
+const lru_cache_1 = require("lru-cache");
 const httpError_1 = require("../errors/httpError");
 const firebase_1 = require("../config/firebase");
 const userService_1 = require("../services/userService");
 function parseBearerToken(header) {
     if (!header)
         return null;
-    const [scheme, token] = header.split(" ");
-    if (scheme?.toLowerCase() !== "bearer" || !token)
+    const match = /^\s*bearer\s+(.+)\s*$/i.exec(header);
+    if (!match)
         return null;
-    return token.trim();
+    const token = match[1]?.trim();
+    if (!token)
+        return null;
+    // Guard against absurdly large headers (basic DoS hardening).
+    if (token.length > 10_000)
+        return null;
+    return token;
 }
+function getStringClaim(token, key) {
+    const value = token[key];
+    return typeof value === "string" ? value : null;
+}
+const tierCache = new lru_cache_1.LRUCache({
+    max: 10_000,
+    ttl: 60_000
+});
+const upsertCache = new lru_cache_1.LRUCache({
+    max: 10_000,
+    ttl: 5 * 60_000
+});
 async function getUserTier(uid) {
+    const cached = tierCache.get(uid);
+    if (cached)
+        return cached;
     const db = (0, firebase_1.getFirestore)();
     const snap = await db.collection("users").doc(uid).get();
     const tier = (snap.exists ? snap.data()?.tier : undefined) ?? "free";
-    return tier === "pro" ? "pro" : "free";
+    const normalized = tier === "pro" ? "pro" : "free";
+    tierCache.set(uid, normalized);
+    return normalized;
 }
 const authenticateUser = async (req, _res, next) => {
     try {
@@ -31,14 +55,18 @@ const authenticateUser = async (req, _res, next) => {
         const auth = (0, firebase_1.getAuth)();
         const decoded = await auth.verifyIdToken(token, true);
         // Ensure user exists/updated in Firestore (server-trusted fields).
-        await (0, userService_1.createOrUpdateUser)(decoded.uid, decoded.email ?? null, decoded.name ?? null, decoded.picture ?? null);
+        // Cache this lightly to avoid write amplification on high-traffic APIs.
+        if (!upsertCache.get(decoded.uid)) {
+            await (0, userService_1.createOrUpdateUser)(decoded.uid, decoded.email ?? null, getStringClaim(decoded, "name"), getStringClaim(decoded, "picture"));
+            upsertCache.set(decoded.uid, true);
+        }
         const tier = await getUserTier(decoded.uid);
         req.user = {
             uid: decoded.uid,
             email: decoded.email ?? null,
             tier,
-            displayName: decoded.name ?? null,
-            photoURL: decoded.picture ?? null
+            displayName: getStringClaim(decoded, "name"),
+            photoURL: getStringClaim(decoded, "picture")
         };
         req.log?.info({ uid: decoded.uid, tier }, "auth_ok");
         next();
@@ -60,14 +88,17 @@ const optionalAuth = async (req, _res, next) => {
     try {
         const auth = (0, firebase_1.getAuth)();
         const decoded = await auth.verifyIdToken(token, true);
-        await (0, userService_1.createOrUpdateUser)(decoded.uid, decoded.email ?? null, decoded.name ?? null, decoded.picture ?? null);
+        if (!upsertCache.get(decoded.uid)) {
+            await (0, userService_1.createOrUpdateUser)(decoded.uid, decoded.email ?? null, getStringClaim(decoded, "name"), getStringClaim(decoded, "picture"));
+            upsertCache.set(decoded.uid, true);
+        }
         const tier = await getUserTier(decoded.uid);
         req.user = {
             uid: decoded.uid,
             email: decoded.email ?? null,
             tier,
-            displayName: decoded.name ?? null,
-            photoURL: decoded.picture ?? null
+            displayName: getStringClaim(decoded, "name"),
+            photoURL: getStringClaim(decoded, "picture")
         };
         req.log?.info({ uid: decoded.uid, tier }, "auth_optional_ok");
         next();

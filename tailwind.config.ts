@@ -1,8 +1,9 @@
 import type { Config } from "tailwindcss";
-// tailwindcss-animate ships CJS; default import works in Vite/TS.
-// eslint-disable-next-line @typescript-eslint/ban-ts-comment
-// @ts-ignore
+import type { PluginCreator } from "tailwindcss/types/config";
 import tailwindcssAnimate from "tailwindcss-animate";
+
+// tailwindcss-animate ships CJS; keep types explicit without ts-ignore.
+const tailwindcssAnimatePlugin = tailwindcssAnimate as unknown as PluginCreator;
 
 export default {
   darkMode: ["class"],
@@ -149,5 +150,5 @@ export default {
       },
     },
   },
-  plugins: [tailwindcssAnimate],
+  plugins: [tailwindcssAnimatePlugin],
 } satisfies Config;

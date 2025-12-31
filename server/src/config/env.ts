@@ -16,6 +16,8 @@ const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: numberFromString.default("8080"),
   CLIENT_ORIGIN: z.string().url().default("http://localhost:5173"),
+  // Optional alternate origin used by some deployments
+  FRONTEND_URL: z.string().url().optional(),
   REQUEST_TIMEOUT_MS: numberFromString.default("30000"),
   GITHUB_API_BASE_URL: z.string().url().default("https://api.github.com"),
   GITHUB_TOKEN: z.string().optional(),

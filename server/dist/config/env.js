@@ -16,6 +16,8 @@ const envSchema = zod_1.z.object({
     NODE_ENV: zod_1.z.enum(["development", "test", "production"]).default("development"),
     PORT: numberFromString.default("8080"),
     CLIENT_ORIGIN: zod_1.z.string().url().default("http://localhost:5173"),
+    // Optional alternate origin used by some deployments
+    FRONTEND_URL: zod_1.z.string().url().optional(),
     REQUEST_TIMEOUT_MS: numberFromString.default("30000"),
     GITHUB_API_BASE_URL: zod_1.z.string().url().default("https://api.github.com"),
     GITHUB_TOKEN: zod_1.z.string().optional(),

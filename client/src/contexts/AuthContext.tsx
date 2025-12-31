@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { User } from "firebase/auth";
 import {
@@ -54,14 +54,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
 
-  const clearRefreshTimer = () => {
+  const clearRefreshTimer = useCallback(() => {
     if (refreshTimerRef.current) {
       window.clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = null;
     }
-  };
+  }, []);
 
-  const scheduleRefresh = (expMs: number) => {
+  const scheduleRefresh = useCallback((expMs: number) => {
     clearRefreshTimer();
 
     // Refresh 5 minutes before expiry (min 30s from now)
@@ -71,9 +71,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshTimerRef.current = window.setTimeout(() => {
       void auth.currentUser?.getIdToken(true).catch(() => undefined);
     }, delay);
-  };
+  }, [clearRefreshTimer]);
 
-  const updateTokenState = async (firebaseUser: User) => {
+  const updateTokenState = useCallback(async (firebaseUser: User) => {
     const [token, tokenResult] = await Promise.all([
       firebaseUser.getIdToken(),
       getIdTokenResult(firebaseUser),
@@ -88,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       : null;
 
     if (tokenExpMsRef.current) scheduleRefresh(tokenExpMsRef.current);
-  };
+  }, [scheduleRefresh]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -121,9 +121,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       clearRefreshTimer();
       unsub();
     };
-  }, []);
+  }, [clearRefreshTimer, updateTokenState]);
 
-  const signUp: AuthContextValue["signUp"] = async (email, password, displayName) => {
+  const signUp: AuthContextValue["signUp"] = useCallback(async (email, password, displayName) => {
     setError(null);
     await trackEvent("sign_up_started", { method: "password" });
     try {
@@ -139,9 +139,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw e;
     }
-  };
+  }, []);
 
-  const signIn: AuthContextValue["signIn"] = async (email, password) => {
+  const signIn: AuthContextValue["signIn"] = useCallback(async (email, password) => {
     setError(null);
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -152,9 +152,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw e;
     }
-  };
+  }, []);
 
-  const signInWithGoogle: AuthContextValue["signInWithGoogle"] = async () => {
+  const signInWithGoogle: AuthContextValue["signInWithGoogle"] = useCallback(async () => {
     setError(null);
     try {
       await signInWithPopup(auth, googleProvider);
@@ -166,9 +166,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw e;
     }
-  };
+  }, []);
 
-  const signInWithGitHub: AuthContextValue["signInWithGitHub"] = async () => {
+  const signInWithGitHub: AuthContextValue["signInWithGitHub"] = useCallback(async () => {
     setError(null);
     try {
       await signInWithPopup(auth, githubProvider);
@@ -180,9 +180,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw e;
     }
-  };
+  }, []);
 
-  const signOut: AuthContextValue["signOut"] = async () => {
+  const signOut: AuthContextValue["signOut"] = useCallback(async () => {
     setError(null);
     try {
       await firebaseSignOut(auth);
@@ -192,9 +192,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw e;
     }
-  };
+  }, []);
 
-  const resetPassword: AuthContextValue["resetPassword"] = async (email) => {
+  const resetPassword: AuthContextValue["resetPassword"] = useCallback(async (email) => {
     setError(null);
     await trackEvent("password_reset_requested");
     try {
@@ -204,9 +204,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw e;
     }
-  };
+  }, []);
 
-  const getIdToken: AuthContextValue["getIdToken"] = async () => {
+  const getIdToken: AuthContextValue["getIdToken"] = useCallback(async () => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return null;
 
@@ -221,9 +221,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return null;
     }
-  };
+  }, [idToken]);
 
-  const refreshIdToken: AuthContextValue["refreshIdToken"] = async () => {
+  const refreshIdToken: AuthContextValue["refreshIdToken"] = useCallback(async () => {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return null;
     try {
@@ -233,7 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return null;
     }
-  };
+  }, []);
 
   const tier = useMemo(() => computeTierFromClaims(claims), [claims]);
 
@@ -254,7 +254,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       getIdToken,
       refreshIdToken,
     }),
-    [user, loading, error, idToken, claims, tier],
+    [
+      user,
+      loading,
+      error,
+      idToken,
+      claims,
+      tier,
+      signUp,
+      signIn,
+      signInWithGoogle,
+      signInWithGitHub,
+      signOut,
+      resetPassword,
+      getIdToken,
+      refreshIdToken,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
