@@ -11,18 +11,22 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useRateLimit, emitUsageUpdate } from '@/hooks/use-rate-limit';
 import { incrementAnalysisUsage } from '@/lib/rateLimit';
 import { trackEvent } from '@/config/firebase';
+import { useAnalysis } from '@/context/AnalysisContext';
 
 const AnalyzePage = () => {
   const navigate = useNavigate();
   const { user, tier } = useAuth();
   const { snapshot } = useRateLimit();
+  const { startAnalysis, setLastJob } = useAnalysis();
   const [username, setUsername] = useState('');
   const [jobUrl, setJobUrl] = useState('');
+  const [jobTitle, setJobTitle] = useState('');
+  const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [errors, setErrors] = useState<{ username?: string; jobUrl?: string }>({});
+  const [errors, setErrors] = useState<{ username?: string; jobUrl?: string; jobTitle?: string; description?: string }>({});
 
   const validateForm = () => {
-    const newErrors: { username?: string; jobUrl?: string } = {};
+    const newErrors: { username?: string; jobUrl?: string; jobTitle?: string; description?: string } = {};
     
     // Username validation: alphanumeric + hyphens only
     if (!username.trim()) {
@@ -40,6 +44,14 @@ const AnalyzePage = () => {
       } catch {
         newErrors.jobUrl = 'Please enter a valid URL';
       }
+    }
+
+    if (!jobTitle.trim()) {
+      newErrors.jobTitle = 'Job title is required';
+    }
+
+    if (!description.trim() || description.trim().length < 50) {
+      newErrors.description = 'Job description is required (50+ characters)';
     }
     
     setErrors(newErrors);
@@ -73,15 +85,15 @@ const AnalyzePage = () => {
         emitUsageUpdate();
       }
 
-      // Simulate analysis time
-      await new Promise(resolve => setTimeout(resolve, 8000));
-      
-      // Navigate to results page
-      navigate('/results/demo');
+      // Persist job details for the API call performed by AnalysisContext.
+      setLastJob({ jobUrl, jobTitle, description });
+
+      const analysisId = await startAnalysis(username.trim(), jobUrl.trim());
+      navigate(`/results/${encodeURIComponent(analysisId)}`);
     } catch (error) {
       toast({
         title: "Analysis Failed",
-        description: "Something went wrong. Please try again.",
+        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -213,6 +225,70 @@ const AnalyzePage = () => {
                       className="text-sm text-destructive"
                     >
                       {errors.jobUrl}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Job Title */}
+              <div className="space-y-2">
+                <label htmlFor="job-title" className="block text-sm font-medium">
+                  Job Title
+                </label>
+                <input
+                  id="job-title"
+                  type="text"
+                  value={jobTitle}
+                  onChange={(e) => {
+                    setJobTitle(e.target.value);
+                    if (errors.jobTitle) setErrors({ ...errors, jobTitle: undefined });
+                  }}
+                  placeholder="Senior Frontend Engineer"
+                  className={`w-full h-12 px-4 rounded-xl bg-muted/50 border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all ${
+                    errors.jobTitle ? 'border-destructive' : 'border-border'
+                  }`}
+                />
+                <AnimatePresence>
+                  {errors.jobTitle && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="text-sm text-destructive"
+                    >
+                      {errors.jobTitle}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Job Description */}
+              <div className="space-y-2">
+                <label htmlFor="job-description" className="block text-sm font-medium">
+                  Job Description
+                </label>
+                <textarea
+                  id="job-description"
+                  value={description}
+                  onChange={(e) => {
+                    setDescription(e.target.value);
+                    if (errors.description) setErrors({ ...errors, description: undefined });
+                  }}
+                  placeholder="Paste the full job description here…"
+                  rows={8}
+                  className={`w-full px-4 py-3 rounded-xl bg-muted/50 border text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent font-mono text-sm transition-all ${
+                    errors.description ? 'border-destructive' : 'border-border'
+                  }`}
+                />
+                <AnimatePresence>
+                  {errors.description && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="text-sm text-destructive"
+                    >
+                      {errors.description}
                     </motion.p>
                   )}
                 </AnimatePresence>

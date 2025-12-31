@@ -4,6 +4,9 @@ import { ExternalLink, Star, GitFork, CheckCircle, Sparkles, FileText, Calendar 
 import { RepoAnalysis, languageColors } from '@/types/analysis';
 import { Button } from '@/components/ui/button';
 import { READMEModal } from './READMEModal';
+import { authFetch } from "@/services/authFetch";
+import type { GenerateReadmeRequest, GitHubRepo, JobPosting } from "@readyrepo/shared";
+import { useAnalysis } from "@/context/AnalysisContext";
 
 interface RepoGridProps {
   repositories: RepoAnalysis[];
@@ -107,11 +110,94 @@ npm start
 export function RepoGrid({ repositories }: RepoGridProps) {
   const [selectedRepo, setSelectedRepo] = useState<RepoAnalysis | null>(null);
   const [enhancedRepos, setEnhancedRepos] = useState<Set<string>>(new Set());
+  const { lastJob, analysisResult } = useAnalysis();
+
+  const apiBase = (import.meta.env.VITE_API_URL || "/api/v1").replace(/\/+$/, "");
+
+  const extractErrorMessage = (json: unknown, fallback: string) => {
+    if (json && typeof json === "object" && !Array.isArray(json)) {
+      const err = (json as Record<string, unknown>)["error"];
+      if (typeof err === "string" && err.trim()) return err;
+    }
+    return fallback;
+  };
+
+  const extractRepoFromResponse = (json: unknown): GitHubRepo | null => {
+    if (!json || typeof json !== "object" || Array.isArray(json)) return null;
+    const data = (json as Record<string, unknown>)["data"];
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    const repo = (data as Record<string, unknown>)["repo"];
+    return (repo as GitHubRepo) ?? null;
+  };
+
+  const extractGeneratedReadme = (json: unknown): string | null => {
+    if (!json || typeof json !== "object" || Array.isArray(json)) return null;
+    const data = (json as Record<string, unknown>)["data"];
+    if (!data || typeof data !== "object" || Array.isArray(data)) return null;
+    const generated = (data as Record<string, unknown>)["generatedReadme"];
+    return typeof generated === "string" && generated.trim() ? generated : null;
+  };
+
+  const parseGitHubUrl = (url: string): { owner: string; repo: string } | null => {
+    try {
+      const u = new URL(url);
+      if (u.hostname !== "github.com") return null;
+      const parts = u.pathname.replace(/^\/+|\/+$/g, "").split("/");
+      if (parts.length < 2) return null;
+      return { owner: parts[0], repo: parts[1] };
+    } catch {
+      return null;
+    }
+  };
 
   const handleGenerateReadme = async (): Promise<string> => {
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    return mockGeneratedReadme;
+    if (!selectedRepo) throw new Error("No repository selected.");
+    if (!lastJob) throw new Error("Missing job details for README generation.");
+
+    const parsed = parseGitHubUrl(selectedRepo.url);
+    if (!parsed) throw new Error("Unsupported repository URL.");
+
+    // 1) Fetch repo snapshot from backend (GitHub API normalization + README fetch)
+    const repoRes = await authFetch(`${apiBase}/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`);
+    const repoJson = (await repoRes.json().catch(() => null)) as unknown;
+    if (!repoRes.ok) {
+      throw new Error(extractErrorMessage(repoJson, "Failed to load repository."));
+    }
+    const repo = extractRepoFromResponse(repoJson);
+    if (!repo) throw new Error("Invalid repo response.");
+
+    // 2) Build job payload (shared type)
+    const job: JobPosting = {
+      url: lastJob.jobUrl,
+      title: lastJob.jobTitle,
+      company: null,
+      description: lastJob.description,
+      requirements: [],
+      skills: [],
+      experienceLevel: null,
+      rawText: lastJob.description,
+    };
+
+    // 3) Generate README
+    const body: GenerateReadmeRequest = {
+      repo,
+      currentReadme: repo.readme ?? null,
+      job,
+      analysisId: analysisResult?.id?.startsWith("local-") ? null : (analysisResult?.id ?? null),
+    };
+
+    const genRes = await authFetch(`${apiBase}/generate-readme`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const genJson = (await genRes.json().catch(() => null)) as unknown;
+    if (!genRes.ok) {
+      throw new Error(extractErrorMessage(genJson, "README generation failed."));
+    }
+    const generated = extractGeneratedReadme(genJson);
+    if (!generated) throw new Error("Empty README generated.");
+    return generated;
   };
 
   const handleModalClose = () => {
