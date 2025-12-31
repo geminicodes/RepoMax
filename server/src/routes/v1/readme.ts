@@ -4,6 +4,9 @@ import { z } from "zod";
 import type { GenerateReadmeRequest } from "@readyrepo/shared";
 import { HttpError } from "../../errors/httpError";
 import { generateEnhancedReadme } from "../../services/readmeGenerationService";
+import { authenticateUser } from "../../middleware/auth";
+import { saveGeneratedREADME } from "../../services/firestoreService";
+import { analyzeJobTone } from "../../services/toneAnalyzer";
 
 const repoSchema = z.object({
   name: z.string().min(1),
@@ -33,7 +36,8 @@ const jobSchema = z.object({
 const generateReadmeSchema = z.object({
   repo: repoSchema,
   currentReadme: z.string().nullable().optional(),
-  job: jobSchema
+  job: jobSchema,
+  analysisId: z.string().nullable().optional()
 });
 
 /**
@@ -54,7 +58,7 @@ export function readmeRouter() {
     })
   );
 
-  router.post("/", async (req, res, next) => {
+  router.post("/", authenticateUser, async (req, res, next) => {
     try {
       const parsed = generateReadmeSchema.safeParse(req.body);
       if (!parsed.success) {
@@ -68,9 +72,32 @@ export function readmeRouter() {
         );
       }
 
+      const user = req.user!;
+
       const input = parsed.data as GenerateReadmeRequest;
       const result = await generateEnhancedReadme(input);
-      res.json({ success: true, data: result });
+
+      let readmeId: string | null = null;
+      if (user.tier === "pro") {
+        const tone = await analyzeJobTone(input.job.description, input.job.url, req.log);
+        const saved = await saveGeneratedREADME({
+          userId: user.uid,
+          analysisId: (parsed.data as any).analysisId ?? null,
+          repoName: input.repo.name,
+          repoUrl: input.repo.htmlUrl,
+          originalREADME: input.currentReadme ?? input.repo.readme ?? null,
+          generatedREADME: result.generatedReadme,
+          tone,
+          jobContext: {
+            jobUrl: input.job.url,
+            jobTitle: input.job.title,
+            company: input.job.company
+          }
+        });
+        readmeId = saved.readmeId;
+      }
+
+      res.json({ success: true, data: { ...result, readmeId } });
     } catch (err) {
       next(err);
     }

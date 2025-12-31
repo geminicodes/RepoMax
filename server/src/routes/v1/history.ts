@@ -1,13 +1,56 @@
 import { Router } from "express";
+import { authenticateUser } from "../../middleware/auth";
+import { HttpError } from "../../errors/httpError";
+import { getAnalysisById, getAnalysisHistory, getUserREADMEs } from "../../services/firestoreService";
 
 /**
- * Placeholder history endpoints.
+ * History endpoints (Pro tier only storage; reads require auth).
+ *
+ * Mounted at `/api/v1/history`.
  */
 export function historyRouter() {
   const router = Router();
-  router.get("/", (_req, res) => {
-    res.status(501).json({ success: false, error: "History endpoint not implemented in this build." });
+
+  router.get("/", authenticateUser, async (req, res, next) => {
+    try {
+      const user = req.user!;
+      const items = await getAnalysisHistory(user.uid, 10);
+      res.json({ success: true, data: { analyses: items } });
+    } catch (err) {
+      next(err);
+    }
   });
+
+  router.get("/analysis/:id", authenticateUser, async (req, res, next) => {
+    try {
+      const user = req.user!;
+      const id = String(req.params.id);
+      const item = await getAnalysisById(id, user.uid);
+      if (!item) {
+        return next(
+          new HttpError({
+            statusCode: 404,
+            publicMessage: "Analysis not found.",
+            internalMessage: "Analysis not found or not owned by user"
+          })
+        );
+      }
+      res.json({ success: true, data: { analysis: item } });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  router.get("/readmes", authenticateUser, async (req, res, next) => {
+    try {
+      const user = req.user!;
+      const items = await getUserREADMEs(user.uid, 20);
+      res.json({ success: true, data: { readmes: items } });
+    } catch (err) {
+      next(err);
+    }
+  });
+
   return router;
 }
 

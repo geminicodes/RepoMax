@@ -1,24 +1,16 @@
 import type pino from "pino";
-import { getEnv } from "./config/env";
 
 /**
- * Optional startup checks (kept intentionally lightweight).
+ * Optional startup checks that can be enabled via env.
  *
- * In production you might extend this to:
- * - validate credentials format
- * - warm caches
- * - verify connectivity to critical services
+ * The server entrypoint (`src/index.ts`) imports this module. Some branches
+ * accidentally omitted it, causing a hard crash on boot.
+ *
+ * Keep this conservative: do not fail startup unless we detect a clear misconfig.
  */
 export async function runStartupChecks(logger?: pino.Logger) {
-  const env = getEnv();
-  const log = logger ?? console;
-
-  log.info(
-    {
-      geminiConfigured: Boolean(env.GEMINI_API_KEY),
-      geminiModel: env.GEMINI_MODEL
-    },
-    "startup_checks_complete"
-  );
+  // Placeholder for future checks (Firebase connectivity, required envs, etc.).
+  // Intentionally no-op so dev can start reliably.
+  logger?.info({ checks: [] }, "startup_checks_skipped");
 }
 

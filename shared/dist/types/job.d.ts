@@ -18,5 +18,24 @@ export interface ToneAnalysis {
     tone: ToneLabel;
     toneDescriptors: string[];
     detectedLanguage: DetectedLanguage;
+    confidence: number;
+    culturalSignals: {
+        keywords: string[];
+        keywordSentiments: Record<string, number>;
+    };
+    contentCategories: Array<{
+        name: string;
+        confidence: number;
+    }>;
+    entities: Array<{
+        name: string;
+        type: string;
+        salience: number;
+    }>;
+    analysisMetadata: {
+        apiCallMade: boolean;
+        cacheKey: string;
+        analyzedAt: string;
+    };
 }
 //# sourceMappingURL=job.d.ts.map

@@ -1,62 +1,161 @@
-# ReadyRepo — GitHub Job Fit Analyzer (MVP Foundation)
+# Welcome to your Lovable project
 
-ReadyRepo analyzes a GitHub profile against a job posting, producing a fit score, repo-by-repo recommendations, and a tone-matched README draft (Spanish + English friendly).
+## Project info
 
-## Monorepo structure
+**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
 
-- **`client/`**: React 18 + Vite + TypeScript
-- **`server/`**: Express + TypeScript API (`/api/v1/...`)
-- **`shared/`**: Shared TypeScript types/utilities
+## How can I edit this code?
 
-## Prerequisites
+There are several ways of editing your application.
 
-- Node.js **20+**
-- npm **9+** (workspaces enabled)
+**Use Lovable**
 
-## Quick start
+Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
 
-1) Install dependencies:
+Changes made via Lovable will be committed automatically to this repo.
 
-```bash
-npm install
+**Use your preferred IDE**
+
+If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+
+The only requirement is having Bun installed - [install Bun](https://bun.sh/docs/installation)
+
+Follow these steps:
+
+```sh
+# Step 1: Clone the repository using the project's Git URL.
+git clone <YOUR_GIT_URL>
+
+# Step 2: Navigate to the project directory.
+cd <YOUR_PROJECT_NAME>
+
+# Step 3: Install the necessary dependencies.
+bun install
+
+# Step 4: Start the development server with auto-reloading and an instant preview.
+bun run dev
 ```
 
-2) Create env files:
+**Edit a file directly in GitHub**
 
-```bash
-cp .env.example .env
-cp client/.env.example client/.env.local
+- Navigate to the desired file(s).
+- Click the "Edit" button (pencil icon) at the top right of the file view.
+- Make your changes and commit the changes.
+
+**Use GitHub Codespaces**
+
+- Navigate to the main page of your repository.
+- Click on the "Code" button (green button) near the top right.
+- Select the "Codespaces" tab.
+- Click on "New codespace" to launch a new Codespace environment.
+- Edit files directly within the Codespace and commit and push your changes once you're done.
+
+## What technologies are used for this project?
+
+This project is built with:
+
+- Bun 1.3.4
+- Vite 7.2.7
+- TypeScript
+- React 19.2.1
+- shadcn-ui
+- Tailwind CSS
+
+## How can I deploy this project?
+
+Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+
+<<<<<<< HEAD
+## Tone detection (Google Cloud Natural Language)
+
+- **Endpoint**: `POST /api/v1/analyze` returns a `ToneAnalysis` object (auth required).
+- **Caching**: in-memory LRU+TTL (default **24h**) to target ~60–80% hit rate.
+- **Language**: heuristic `en`/`es` detection; NL sentiment/entities run for both; text classification runs for `en` when supported.
+
+## Authentication + persistence (Firebase Auth + Firestore)
+
+- **Auth**: client signs in (email/password or Google OAuth) → obtains Firebase ID token → sends `Authorization: Bearer <token>` to the API.
+- **Server verification**: Admin SDK verifies the token, loads the user tier from Firestore, and attaches `req.user = { uid, email, tier }`.
+- **Tiers**
+  - **free**: 3 analyses/month, **no history stored**
+  - **pro**: unlimited, analysis + README history stored
+
+### Frontend integration (example)
+
+```ts
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+
+const app = initializeApp({ apiKey, authDomain, projectId });
+const auth = getAuth(app);
+
+const cred = await signInWithEmailAndPassword(auth, email, password);
+const idToken = await cred.user.getIdToken();
+
+await fetch("/api/v1/analyze", {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    Authorization: `Bearer ${idToken}`
+  },
+  body: JSON.stringify({ githubUsername, jobUrl, jobTitle, description })
+});
 ```
 
-3) Validate env vars:
+### Firestore rules
 
-```bash
-npm run env:check
+This repo includes `firestore.rules` with per-user read access to `users`, `analyses`, and `readmes`.
+
+## Tone detection (Google Cloud Natural Language)
+
+- **Endpoint**: `POST /api/v1/analyze` returns a `ToneAnalysis` object (auth required).
+- **Caching**: in-memory LRU+TTL (default **24h**) to target ~60–80% hit rate.
+- **Language**: heuristic `en`/`es` detection; NL sentiment/entities run for both; text classification runs for `en` when supported.
+
+## Authentication + persistence (Firebase Auth + Firestore)
+
+- **Auth**: client signs in (email/password or Google OAuth) → obtains Firebase ID token → sends `Authorization: Bearer <token>` to the API.
+- **Server verification**: Admin SDK verifies the token, loads the user tier from Firestore, and attaches `req.user = { uid, email, tier }`.
+- **Tiers**
+  - **free**: 3 analyses/month, **no history stored**
+  - **pro**: unlimited, analysis + README history stored
+
+### Frontend integration (example)
+
+```ts
+import { initializeApp } from "firebase/app";
+import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
+
+const app = initializeApp({ apiKey, authDomain, projectId });
+const auth = getAuth(app);
+
+const cred = await signInWithEmailAndPassword(auth, email, password);
+const idToken = await cred.user.getIdToken();
+
+await fetch("/api/v1/analyze", {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    Authorization: `Bearer ${idToken}`
+  },
+  body: JSON.stringify({ githubUsername, jobUrl, jobTitle, description })
+});
 ```
 
-4) Run locally (client + server):
+### Firestore rules
 
-```bash
-npm run dev
-```
-
-- Client: `http://localhost:5173`
-- Server: `http://localhost:8080/api/health`
-
-## Generate an improved README (copy/paste ready)
-
-- **Endpoint**: `POST /api/generate-readme` (alias of `POST /api/v1/generate-readme`)
-- **UI**: open the client at `http://localhost:5173` and use the README Generator screen.
+This repo includes `firestore.rules` with per-user read access to `users`, `analyses`, and `readmes`.
 
 ## Google Cloud setup (required services)
+=======
+## Can I connect a custom domain to my Lovable project?
+>>>>>>> origin/frontend-lovable
 
-### Gemini API key (AI Studio)
+Yes, you can!
 
-- Go to Google AI Studio and create an API key.
-- Set:
-  - `GEMINI_API_KEY=...`
-  - `GEMINI_MODEL=gemini-1.5-flash` (recommended for speed)
+To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
+<<<<<<< HEAD
 ### Cloud Natural Language API
 
 1) Create/choose a Google Cloud project
@@ -79,6 +178,7 @@ Also set:
    - `GOOGLE_APPLICATION_CREDENTIALS=...` OR `GCP_SERVICE_ACCOUNT_JSON=...`
 5) Set:
    - `FIREBASE_PROJECT_ID=your-firebase-project-id`
+   - `FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account", ...}'` (recommended for server auth + Firestore)
 
 **Planned collections**
 - `users`: user profiles + preferences
@@ -103,3 +203,6 @@ Also set:
 - `npm run dev`: run client + server concurrently
 - `npm run build`: build shared, server, and client
 - `npm run env:check`: validate required environment variables
+=======
+Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+>>>>>>> origin/frontend-lovable

@@ -1,4 +1,4 @@
-export interface GitHubRepo {
+export type GitHubRepo = {
   name: string;
   fullName: string;
   htmlUrl: string;
@@ -6,19 +6,9 @@ export interface GitHubRepo {
   languages: string[];
   stars: number;
   forks: number;
-  updatedAt: string; // ISO
+  updatedAt: string;
   defaultBranch: string;
   readme: string | null;
   topics: string[];
-}
+};
 
-export interface GitHubUserReposResponse {
-  username: string;
-  repos: GitHubRepo[];
-  fetchedAt: string; // ISO
-  rateLimit?: {
-    remaining: number;
-    limit: number;
-    resetAt: string; // ISO
-  };
-}

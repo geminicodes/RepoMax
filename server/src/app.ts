@@ -19,21 +19,26 @@ export function createApp() {
   const app = express();
 
   app.set("trust proxy", 1);
-  app.set("logger", logger);
 
   app.use(pinoHttp({ logger }));
   app.use(requestTimeout());
   app.use(helmet());
   app.use(compression());
 
+  /**
+   * CORS
+   *
+   * - In Codespaces/dev, the frontend origin is often a forwarded URL
+   *   like `https://<name>-5173.app.github.dev`, not `http://localhost:5173`.
+   *   Reflecting the request Origin in development avoids repeated CORS failures.
+   * - In production, restrict to the configured `CLIENT_ORIGIN`.
+   */
   app.use(
     cors({
-      origin: (origin, cb) => {
-        if (!origin) return cb(null, true);
-        const allowed = [env.CLIENT_ORIGIN];
-        if (allowed.includes(origin)) return cb(null, true);
-        return cb(new Error("CORS blocked"), false);
-      },
+      origin:
+        env.NODE_ENV === "development"
+          ? true
+          : (process.env.FRONTEND_URL ?? env.CLIENT_ORIGIN),
       credentials: true
     })
   );
@@ -48,6 +53,30 @@ export function createApp() {
       legacyHeaders: false
     })
   );
+
+  // Friendly root page for Codespaces port forwarding (API is mounted at /api).
+  app.get("/", (_req, res) => {
+    res
+      .status(200)
+      .type("html")
+      .send(
+        [
+          "<!doctype html>",
+          "<html>",
+          "<head><meta charset='utf-8'><title>ReadyRepo API</title></head>",
+          "<body style='font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; padding: 24px'>",
+          "<h1>ReadyRepo API is running</h1>",
+          "<p>This port serves the backend API. Try:</p>",
+          "<ul>",
+          "<li><a href='/api/health'>/api/health</a></li>",
+          "<li><a href='/api/v1'>/api/v1</a></li>",
+          "</ul>",
+          "<p>For the web UI in Codespaces, open the forwarded port for the Vite dev server (usually <b>5173</b>).</p>",
+          "</body>",
+          "</html>"
+        ].join("")
+      );
+  });
 
   app.use("/api", apiRouter());
 

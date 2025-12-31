@@ -9,6 +9,9 @@ const express_rate_limit_1 = __importDefault(require("express-rate-limit"));
 const zod_1 = require("zod");
 const httpError_1 = require("../../errors/httpError");
 const readmeGenerationService_1 = require("../../services/readmeGenerationService");
+const auth_1 = require("../../middleware/auth");
+const firestoreService_1 = require("../../services/firestoreService");
+const toneAnalyzer_1 = require("../../services/toneAnalyzer");
 const repoSchema = zod_1.z.object({
     name: zod_1.z.string().min(1),
     fullName: zod_1.z.string().min(1),
@@ -35,7 +38,8 @@ const jobSchema = zod_1.z.object({
 const generateReadmeSchema = zod_1.z.object({
     repo: repoSchema,
     currentReadme: zod_1.z.string().nullable().optional(),
-    job: jobSchema
+    job: jobSchema,
+    analysisId: zod_1.z.string().nullable().optional()
 });
 /**
  * README generation endpoints mounted at:
@@ -51,7 +55,7 @@ function readmeRouter() {
         standardHeaders: "draft-7",
         legacyHeaders: false
     }));
-    router.post("/", async (req, res, next) => {
+    router.post("/", auth_1.authenticateUser, async (req, res, next) => {
         try {
             const parsed = generateReadmeSchema.safeParse(req.body);
             if (!parsed.success) {
@@ -62,9 +66,29 @@ function readmeRouter() {
                     details: { issues: parsed.error.issues }
                 }));
             }
+            const user = req.user;
             const input = parsed.data;
             const result = await (0, readmeGenerationService_1.generateEnhancedReadme)(input);
-            res.json({ success: true, data: result });
+            let readmeId = null;
+            if (user.tier === "pro") {
+                const tone = await (0, toneAnalyzer_1.analyzeJobTone)(input.job.description, input.job.url, req.log);
+                const saved = await (0, firestoreService_1.saveGeneratedREADME)({
+                    userId: user.uid,
+                    analysisId: parsed.data.analysisId ?? null,
+                    repoName: input.repo.name,
+                    repoUrl: input.repo.htmlUrl,
+                    originalREADME: input.currentReadme ?? input.repo.readme ?? null,
+                    generatedREADME: result.generatedReadme,
+                    tone,
+                    jobContext: {
+                        jobUrl: input.job.url,
+                        jobTitle: input.job.title,
+                        company: input.job.company
+                    }
+                });
+                readmeId = saved.readmeId;
+            }
+            res.json({ success: true, data: { ...result, readmeId } });
         }
         catch (err) {
             next(err);
@@ -72,3 +96,4 @@ function readmeRouter() {
     });
     return router;
 }
+//# sourceMappingURL=readme.js.map

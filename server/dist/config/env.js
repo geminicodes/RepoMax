@@ -20,13 +20,18 @@ const envSchema = zod_1.z.object({
     GITHUB_API_BASE_URL: zod_1.z.string().url().default("https://api.github.com"),
     GITHUB_TOKEN: zod_1.z.string().optional(),
     GITHUB_CACHE_TTL_MS: numberFromString.default("300000"),
+    // Common Google/Firebase env var aliases used across deployments
+    GOOGLE_CLOUD_PROJECT_ID: zod_1.z.string().min(1).optional(),
     GCP_PROJECT_ID: zod_1.z.string().min(1).optional(),
     FIREBASE_PROJECT_ID: zod_1.z.string().min(1).optional(),
     GOOGLE_APPLICATION_CREDENTIALS: zod_1.z.string().min(1).optional(),
+    GOOGLE_CLOUD_CREDENTIALS_JSON: zod_1.z.string().min(1).optional(),
     GCP_SERVICE_ACCOUNT_JSON: zod_1.z.string().min(1).optional(),
+    FIREBASE_SERVICE_ACCOUNT_JSON: zod_1.z.string().min(1).optional(),
     GEMINI_API_KEY: zod_1.z.string().min(1).optional(),
     GEMINI_MODEL: zod_1.z.string().min(1).default("gemini-1.5-flash"),
     STARTUP_CHECKS_ENABLED: boolFromString.default("true"),
+    TONE_CACHE_TTL_HOURS: numberFromString.optional(),
     // Optional: server-side GA Measurement Protocol
     GA4_MEASUREMENT_ID: zod_1.z.string().min(1).optional(),
     GA4_API_SECRET: zod_1.z.string().min(1).optional()
@@ -43,3 +48,4 @@ function getEnv() {
         .join("; ");
     throw new Error(`Invalid environment configuration: ${message}`);
 }
+//# sourceMappingURL=env.js.map

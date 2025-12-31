@@ -1,42 +1,16 @@
 import type { GitHubRepo } from "./github";
-import type { JobPosting, ToneLabel, DetectedLanguage } from "./job";
+import type { JobPosting, ToneAnalysis } from "./job";
 
-/**
- * Stored artifact for a README generation run.
- */
-export interface READMEGeneration {
-  repoName: string;
-  tone: ToneLabel | string;
-  language: DetectedLanguage;
-  generatedREADME: string;
-  createdAt: string; // ISO
-}
-
-export interface GenerateReadmeRequest {
-  /**
-   * Repository metadata + signals available to the generator.
-   */
+export type GenerateReadmeRequest = {
   repo: GitHubRepo;
-
-  /**
-   * Current README content (if any). If omitted, `repo.readme` may be used.
-   */
   currentReadme?: string | null;
-
-  /**
-   * Target job context to tailor the README for.
-   */
   job: JobPosting;
-}
+  analysisId?: string | null;
+};
 
-export interface GenerateReadmeResponse {
-  /**
-   * Enhanced README in Markdown format (copy/paste ready).
-   */
+export type GenerateReadmeResponse = {
   generatedReadme: string;
-
-  /**
-   * Safety / quality notes (e.g., stripped links, minimal repo disclaimer).
-   */
   warnings: string[];
-}
+  toneAnalysis?: ToneAnalysis | null;
+};
+

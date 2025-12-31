@@ -4,6 +4,7 @@ exports.buildReadmeGenerationPrompt = buildReadmeGenerationPrompt;
 exports.generateEnhancedReadme = generateEnhancedReadme;
 const httpError_1 = require("../errors/httpError");
 const geminiService_1 = require("./geminiService");
+const toneAnalyzer_1 = require("./toneAnalyzer");
 function isSubstantialRepo(repo, readme) {
     const readmeLen = (readme ?? "").trim().length;
     const hasSignals = Boolean(repo.description?.trim()) ||
@@ -72,7 +73,7 @@ function buildAllowedLinks(repo, job) {
     return allowed;
 }
 function buildReadmeGenerationPrompt(params) {
-    const { repo, currentReadme, job } = params;
+    const { repo, currentReadme, job, toneAnalysis } = params;
     const existing = (currentReadme ?? "").trim();
     const repoSummary = {
         name: repo.name,
@@ -100,6 +101,7 @@ function buildReadmeGenerationPrompt(params) {
         ``,
         `TARGET IMPACT: Make this README stand out to recruiters reviewing for "${job.title}".`,
         `Highlight skills/technologies that align with the job requirements, but only if supported by the repo data/README.`,
+        `Generate README matching: ${(0, geminiService_1.formatToneContextForPrompt)(toneAnalysis ?? null)}`,
         ``,
         `LENGTH: Aim for 300–500 words (excluding code blocks).`,
         ``,
@@ -154,10 +156,18 @@ async function generateEnhancedReadme(input) {
             }
         });
     }
+    let toneAnalysis = null;
+    try {
+        toneAnalysis = await (0, toneAnalyzer_1.analyzeJobTone)(input.job.description, input.job.url);
+    }
+    catch {
+        toneAnalysis = null;
+    }
     const prompt = buildReadmeGenerationPrompt({
         repo: input.repo,
         currentReadme,
-        job: input.job
+        job: input.job,
+        toneAnalysis
     });
     const raw = await (0, geminiService_1.generateTextWithGemini)({ prompt, temperature: 0.4 });
     if (!raw) {
@@ -179,3 +189,4 @@ async function generateEnhancedReadme(input) {
     }
     return { generatedReadme: sanitized.markdown, warnings };
 }
+//# sourceMappingURL=readmeGenerationService.js.map
