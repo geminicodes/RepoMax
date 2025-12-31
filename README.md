@@ -1,208 +1,154 @@
-# Welcome to your Lovable project
+# ReadyRepo
+ 
+ReadyRepo is a web app + API that helps you tailor your GitHub presence to a specific job posting. It focuses on **tone analysis** of the job description and **AI-assisted README rewrites** (grounded to the repo’s actual metadata/README).
+ 
+> Monorepo MVP foundation: UI + authenticated API + tone analysis + README generation.
+ 
+## What’s in this repo
+ 
+- **`client/`** — React + Vite + TypeScript (web UI)
+- **`server/`** — Express + TypeScript (API, Firebase Admin auth, optional Google services)
+- **`shared/`** — Shared TypeScript types used by client/server
+ 
+## Current status (important)
+ 
+This repo is an MVP foundation. A few endpoints are intentionally conservative/placeholder:
+ 
+- **`POST /api/v1/analyze`** performs **job tone analysis** and returns an `analysisResult` shape with **scores set to 0** (the “full scoring engine” isn’t implemented in this build).
+- **`POST /api/v1/generate-readme`** generates a README via Gemini **only when the repo has enough signals** (description/topics/languages/README length). It also sanitizes links so the model can’t invent external URLs.
+ 
+## Prerequisites
+ 
+- Node.js **20+**
+- npm **9+** (npm workspaces)
+ 
+## Quick start (local dev)
+ 
+### 1) Install dependencies (workspace root)
+ 
+```bash
+npm install
+2) Server env (.env in repo root)
+Copy the example and adjust as needed:
 
-## Project info
+cp server/.env.example .env
+Notes:
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+The server reads env from the repo root .env.
+PORT defaults to 8080 in code if you don’t set it.
+3) Client env (client/.env.local)
+Create client/.env.local (this repo does not include a client env example):
 
-## How can I edit this code?
+# Firebase Web App config (required for the UI auth flow)
+VITE_FIREBASE_API_KEY=...
+VITE_FIREBASE_AUTH_DOMAIN=...
+VITE_FIREBASE_PROJECT_ID=...
+VITE_FIREBASE_APP_ID=...
+ 
+# Optional: enables Firebase Analytics if provided
+VITE_FIREBASE_MEASUREMENT_ID=...
+ 
+# Optional but recommended for local dev:
+# Use a full URL to your backend (especially if your server isn't proxied behind Vite).
+VITE_API_URL=http://localhost:8080/api/v1
+If you set PORT=3000 in .env, then set:
 
-There are several ways of editing your application.
+VITE_API_URL=http://localhost:3000/api/v1
+4) Validate server env values
+npm run env:check -w server
+5) Run client + server together
+npm run dev
+Default URLs:
 
-**Use Lovable**
+Client: http://localhost:5173
+Server: http://localhost:8080
+Health: http://localhost:8080/api/health
+Build + run (production-style)
+Build all workspaces:
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+npm run build
+Run the API:
 
-Changes made via Lovable will be committed automatically to this repo.
+npm run start -w server
+Preview the built client (Vite preview):
 
-**Use your preferred IDE**
+npm run preview -w client
+Authentication (how API requests work)
+Most API endpoints require a Firebase Auth ID token:
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+The client signs users in via Firebase Auth (email/password, Google, GitHub).
+The client attaches Authorization: Bearer <idToken> to API requests.
+The server verifies tokens using Firebase Admin (server/src/middleware/auth.ts).
+If Firebase Admin credentials are not configured on the server, authenticated endpoints will fail.
 
-The only requirement is having Bun installed - [install Bun](https://bun.sh/docs/installation)
+API overview
+Base path: /api
 
-Follow these steps:
+Health
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+GET /api/health
+v1
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+POST /api/v1/analyze (auth required)
+POST /api/v1/generate-readme (auth required)
+POST /api/v1/feedback (auth required; accepted but not persisted in this build)
+GET /api/v1/history (auth required; Pro-tier storage)
+GET /api/v1/history/analysis/:id (auth required)
+GET /api/v1/history/readmes (auth required)
+Environment variables (server)
+The server validates env values in server/src/config/env.ts. Common ones:
 
-# Step 3: Install the necessary dependencies.
-bun install
+Core
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-bun run dev
-```
+NODE_ENV (development | test | production)
+PORT (default 8080)
+CLIENT_ORIGIN (default http://localhost:5173)
+REQUEST_TIMEOUT_MS (default 30000)
+GitHub (optional)
 
-**Edit a file directly in GitHub**
+GITHUB_TOKEN (for higher rate limits)
+GITHUB_API_BASE_URL (default https://api.github.com)
+GITHUB_CACHE_TTL_MS (default 300000)
+Gemini (required for README generation)
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+GEMINI_API_KEY
+GEMINI_MODEL (default gemini-1.5-flash)
+Google Cloud Natural Language (optional; improves tone analysis)
 
-**Use GitHub Codespaces**
+Provide credentials via one of:
+GOOGLE_APPLICATION_CREDENTIALS=/abs/path/to/service-account.json (ADC), or
+GCP_SERVICE_ACCOUNT_JSON='{...}', or
+GOOGLE_CLOUD_CREDENTIALS_JSON='{...}'
+Project ID via one of:
+GCP_PROJECT_ID=... or GOOGLE_CLOUD_PROJECT_ID=...
+Firebase Admin / Firestore (required for auth + persistence features)
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Bun 1.3.4
-- Vite 7.2.7
-- TypeScript
-- React 19.2.1
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-<<<<<<< HEAD
-## Tone detection (Google Cloud Natural Language)
-
-- **Endpoint**: `POST /api/v1/analyze` returns a `ToneAnalysis` object (auth required).
-- **Caching**: in-memory LRU+TTL (default **24h**) to target ~60–80% hit rate.
-- **Language**: heuristic `en`/`es` detection; NL sentiment/entities run for both; text classification runs for `en` when supported.
-
-## Authentication + persistence (Firebase Auth + Firestore)
-
-- **Auth**: client signs in (email/password or Google OAuth) → obtains Firebase ID token → sends `Authorization: Bearer <token>` to the API.
-- **Server verification**: Admin SDK verifies the token, loads the user tier from Firestore, and attaches `req.user = { uid, email, tier }`.
-- **Tiers**
-  - **free**: 3 analyses/month, **no history stored**
-  - **pro**: unlimited, analysis + README history stored
-
-### Frontend integration (example)
-
-```ts
-import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-
-const app = initializeApp({ apiKey, authDomain, projectId });
-const auth = getAuth(app);
-
-const cred = await signInWithEmailAndPassword(auth, email, password);
-const idToken = await cred.user.getIdToken();
-
-await fetch("/api/v1/analyze", {
-  method: "POST",
-  headers: {
-    "content-type": "application/json",
-    Authorization: `Bearer ${idToken}`
-  },
-  body: JSON.stringify({ githubUsername, jobUrl, jobTitle, description })
-});
-```
-
-### Firestore rules
-
-This repo includes `firestore.rules` with per-user read access to `users`, `analyses`, and `readmes`.
-
-## Tone detection (Google Cloud Natural Language)
-
-- **Endpoint**: `POST /api/v1/analyze` returns a `ToneAnalysis` object (auth required).
-- **Caching**: in-memory LRU+TTL (default **24h**) to target ~60–80% hit rate.
-- **Language**: heuristic `en`/`es` detection; NL sentiment/entities run for both; text classification runs for `en` when supported.
-
-## Authentication + persistence (Firebase Auth + Firestore)
-
-- **Auth**: client signs in (email/password or Google OAuth) → obtains Firebase ID token → sends `Authorization: Bearer <token>` to the API.
-- **Server verification**: Admin SDK verifies the token, loads the user tier from Firestore, and attaches `req.user = { uid, email, tier }`.
-- **Tiers**
-  - **free**: 3 analyses/month, **no history stored**
-  - **pro**: unlimited, analysis + README history stored
-
-### Frontend integration (example)
-
-```ts
-import { initializeApp } from "firebase/app";
-import { getAuth, signInWithEmailAndPassword } from "firebase/auth";
-
-const app = initializeApp({ apiKey, authDomain, projectId });
-const auth = getAuth(app);
-
-const cred = await signInWithEmailAndPassword(auth, email, password);
-const idToken = await cred.user.getIdToken();
-
-await fetch("/api/v1/analyze", {
-  method: "POST",
-  headers: {
-    "content-type": "application/json",
-    Authorization: `Bearer ${idToken}`
-  },
-  body: JSON.stringify({ githubUsername, jobUrl, jobTitle, description })
-});
-```
-
-### Firestore rules
-
-This repo includes `firestore.rules` with per-user read access to `users`, `analyses`, and `readmes`.
-
-## Google Cloud setup (required services)
-=======
-## Can I connect a custom domain to my Lovable project?
->>>>>>> origin/frontend-lovable
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-<<<<<<< HEAD
-### Cloud Natural Language API
-
-1) Create/choose a Google Cloud project
-2) Enable **Cloud Natural Language API**
-3) Create credentials:
-   - Recommended for local dev: **Service Account JSON**
-4) Provide credentials via either:
-   - `GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/service-account.json` (recommended), OR
-   - `GCP_SERVICE_ACCOUNT_JSON='{"type":"service_account", ...}'` (raw JSON string)
-
-Also set:
-- `GCP_PROJECT_ID=your-project-id`
-
-### Firebase (Firestore + Admin SDK)
-
-1) Create a Firebase project (or link an existing GCP project)
-2) Enable **Firestore**
-3) Generate a **service account key** (Project Settings → Service accounts)
-4) Provide credentials via the same mechanism as above:
-   - `GOOGLE_APPLICATION_CREDENTIALS=...` OR `GCP_SERVICE_ACCOUNT_JSON=...`
-5) Set:
-   - `FIREBASE_PROJECT_ID=your-firebase-project-id`
-   - `FIREBASE_SERVICE_ACCOUNT_JSON='{"type":"service_account", ...}'` (recommended for server auth + Firestore)
-
-**Planned collections**
-- `users`: user profiles + preferences
-- `analyses`: analysis runs (input + outputs + timestamps)
-- `feedback`: user feedback on recommendations/READMEs
-
-### Google Analytics 4 (GA4)
-
-1) Create a GA4 property and get a Measurement ID like `G-XXXXXXXXXX`
-2) Set in `client/.env.local`:
-   - `VITE_GA_MEASUREMENT_ID=G-XXXXXXXXXX`
-
-## Health checks
-
-- `GET /api/health`: server status + external service status (GitHub + Google services).
-- Startup checks:
-  - Env vars are validated on boot.
-  - Reachability checks run with tight timeouts; failures do **not** leak stack traces to clients.
-
-## Scripts
-
-- `npm run dev`: run client + server concurrently
-- `npm run build`: build shared, server, and client
-- `npm run env:check`: validate required environment variables
-=======
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
->>>>>>> origin/frontend-lovable
+FIREBASE_PROJECT_ID=... (recommended)
+Provide credentials via one of:
+GOOGLE_APPLICATION_CREDENTIALS=/abs/path/to/service-account.json (ADC), or
+FIREBASE_SERVICE_ACCOUNT_JSON='{...}', or
+GCP_SERVICE_ACCOUNT_JSON='{...}'
+Google Cloud setup (recommended for full functionality)
+Gemini API key (Google AI Studio)
+Create an API key in AI Studio
+Set GEMINI_API_KEY
+Optionally set GEMINI_MODEL (default is already set)
+Cloud Natural Language API (tone analysis)
+Enable Cloud Natural Language API in your GCP project
+Provide credentials (see env section). If unavailable, the server falls back to a simpler keyword-based tone heuristic.
+Firebase (Auth + Firestore)
+Create/link a Firebase project
+Enable Authentication providers you want (Email, Google, GitHub)
+Enable Firestore (used for user records + history/README storage for Pro tier)
+Create a service account key and configure Firebase Admin credentials on the server
+Add Firebase Web App config to client/.env.local (VITE_FIREBASE_*)
+Troubleshooting
+UI can’t reach the API
+Set VITE_API_URL in client/.env.local to http://localhost:<PORT>/api/v1.
+CORS errors
+Ensure CLIENT_ORIGIN matches your frontend URL (especially for port-forwarded/Codespaces URLs).
+401s from the API
+Endpoints require Authorization: Bearer <Firebase ID token>. Make sure Firebase Auth is configured on both client and server.
+Scripts (workspace root)
+npm run dev — starts server + client together
+npm run build — builds shared, server, then client
