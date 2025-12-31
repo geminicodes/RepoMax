@@ -96,3 +96,4 @@ function readmeRouter() {
     });
     return router;
 }
+//# sourceMappingURL=readme.js.map

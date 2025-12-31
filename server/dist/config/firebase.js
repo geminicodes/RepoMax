@@ -49,3 +49,4 @@ function getFirestore() {
     initializeFirebase();
     return firebase_admin_1.default.firestore();
 }
+//# sourceMappingURL=firebase.js.map

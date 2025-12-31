@@ -93,3 +93,4 @@ function analyzeRouter() {
     });
     return router;
 }
+//# sourceMappingURL=analyze.js.map
