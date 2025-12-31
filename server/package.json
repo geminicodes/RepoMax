@@ -13,7 +13,7 @@
   "dependencies": {
     "@google-cloud/language": "6.3.0",
     "@google/generative-ai": "0.21.0",
-    "@readyrepo/shared": "0.1.0",
+    "@readyrepo/shared": "file:../shared",
     "cheerio": "1.0.0",
     "compression": "^1.8.1",
     "cors": "2.8.5",
