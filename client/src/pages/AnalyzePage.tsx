@@ -12,6 +12,7 @@ import { useRateLimit, emitUsageUpdate } from '@/hooks/use-rate-limit';
 import { setAnalysisUsage } from '@/lib/rateLimit';
 import { trackEvent } from '@/config/firebase';
 import { useAnalysis } from '@/context/AnalysisContext';
+import { useDelayedFlag } from "@/hooks/use-delayed-flag";
 
 const AnalyzePage = () => {
   const navigate = useNavigate();
@@ -24,6 +25,7 @@ const AnalyzePage = () => {
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{ username?: string; jobUrl?: string; jobTitle?: string; description?: string }>({});
+  const showLoadingOverlay = useDelayedFlag(isLoading, 250);
 
   const validateForm = () => {
     const newErrors: { username?: string; jobUrl?: string; jobTitle?: string; description?: string } = {};
@@ -109,7 +111,7 @@ const AnalyzePage = () => {
       <div className="absolute inset-0 bg-gradient-mesh" />
       
       <AnimatePresence>
-        {isLoading && <AnalysisLoading />}
+        {showLoadingOverlay && <AnalysisLoading />}
       </AnimatePresence>
       
       <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
