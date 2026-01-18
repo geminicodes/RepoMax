@@ -9,6 +9,7 @@ import { AnalysisProvider } from "@/context/AnalysisContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ErrorBoundary } from "@/components/shared/ErrorBoundary";
+import { OfflineBanner } from "@/components/shared/OfflineBanner";
 
 const Index = lazy(() => import("./pages/Index"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -32,6 +33,7 @@ const App = () => (
             <TooltipProvider>
               <Toaster />
               <Sonner />
+              <OfflineBanner />
               <BrowserRouter>
                 <Suspense
                   fallback={
