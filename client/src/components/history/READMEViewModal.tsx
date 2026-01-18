@@ -2,8 +2,6 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Download, Check, Github, Briefcase } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Button } from '@/components/ui/button';
 import { SavedREADME, toneColors, toneLabels } from '@/types/history';
 import { toast } from '@/hooks/use-toast';
@@ -196,18 +194,11 @@ export function READMEViewModal({ readme, isOpen, onClose }: READMEViewModalProp
                             {children}
                           </code>
                         ) : (
-                          <SyntaxHighlighter
-                            style={oneDark}
-                            language={match[1]}
-                            PreTag="div"
-                            customStyle={{
-                              margin: 0,
-                              borderRadius: '0.5rem',
-                              fontSize: '0.875rem',
-                            }}
-                          >
-                            {String(children).replace(/\n$/, '')}
-                          </SyntaxHighlighter>
+                          <pre className="my-3 rounded-lg bg-muted/40 border border-border/60 overflow-auto">
+                            <code className="block p-3 text-sm font-mono">
+                              {String(children).replace(/\n$/, '')}
+                            </code>
+                          </pre>
                         );
                       },
                       h1: ({ children }) => (

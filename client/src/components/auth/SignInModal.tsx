@@ -81,6 +81,7 @@ export function SignInModal({
   };
 
   const onSubmit = async (values: FormValues) => {
+    if (submitting) return;
     setSubmitting(true);
     try {
       persistEmail(values.email);
@@ -99,6 +100,7 @@ export function SignInModal({
   };
 
   const social = async (fn: () => Promise<void>) => {
+    if (submitting) return;
     setSubmitting(true);
     try {
       await fn();

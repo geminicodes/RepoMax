@@ -2,8 +2,6 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Copy, Download, Check, FileText, Eye, Code, Sparkles, ArrowRight, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/hooks/use-toast';
 
@@ -314,14 +312,11 @@ export function READMEModal({
                                       {children}
                                     </code>
                                   ) : (
-                                    <SyntaxHighlighter
-                                      style={oneDark}
-                                      language={match[1]}
-                                      PreTag="div"
-                                      customStyle={{ borderRadius: '0.5rem', fontSize: '0.875rem' }}
-                                    >
-                                      {String(children).replace(/\n$/, '')}
-                                    </SyntaxHighlighter>
+                                    <pre className="my-3 rounded-lg bg-muted/40 border border-border/60 overflow-auto">
+                                      <code className="block p-3 text-sm font-mono">
+                                        {String(children).replace(/\n$/, '')}
+                                      </code>
+                                    </pre>
                                   );
                                 },
                               }}
@@ -365,14 +360,11 @@ export function READMEModal({
                                       {children}
                                     </code>
                                   ) : (
-                                    <SyntaxHighlighter
-                                      style={oneDark}
-                                      language={match[1]}
-                                      PreTag="div"
-                                      customStyle={{ borderRadius: '0.5rem', fontSize: '0.875rem' }}
-                                    >
-                                      {String(children).replace(/\n$/, '')}
-                                    </SyntaxHighlighter>
+                                    <pre className="my-3 rounded-lg bg-muted/40 border border-border/60 overflow-auto">
+                                      <code className="block p-3 text-sm font-mono">
+                                        {String(children).replace(/\n$/, '')}
+                                      </code>
+                                    </pre>
                                   );
                                 },
                               }}
