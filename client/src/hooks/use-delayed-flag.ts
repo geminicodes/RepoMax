@@ -10,8 +10,10 @@ export function useDelayedFlag(flag: boolean, delayMs = 200) {
 
   useEffect(() => {
     if (!flag) {
-      setDelayed(false);
-      return;
+      // Make this async to satisfy strict hook lint rules and avoid
+      // synchronous setState-in-effect warnings.
+      const t = window.setTimeout(() => setDelayed(false), 0);
+      return () => window.clearTimeout(t);
     }
 
     const t = window.setTimeout(() => setDelayed(true), Math.max(0, delayMs));

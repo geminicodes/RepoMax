@@ -16,7 +16,10 @@ export function safeInternalRedirect(to: string | null | undefined, fallback = "
   if (candidate.includes("://")) return fallback;
 
   // Disallow control chars / obvious script-y payloads.
-  if (/[\u0000-\u001F\u007F]/.test(candidate)) return fallback;
+  for (let i = 0; i < candidate.length; i++) {
+    const c = candidate.charCodeAt(i);
+    if ((c >= 0 && c <= 31) || c === 127) return fallback;
+  }
   if (/^\s*javascript:/i.test(candidate)) return fallback;
 
   return candidate;

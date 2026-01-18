@@ -20,7 +20,6 @@ export class ErrorBoundary extends React.Component<Props, State> {
   componentDidCatch(err: unknown) {
     // Avoid logging sensitive user data; keep it minimal.
     if (import.meta.env.DEV) {
-      // eslint-disable-next-line no-console
       console.error("[ui] render error", err);
     }
   }
