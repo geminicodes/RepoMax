@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { analyzeRouter } from "./analyze";
 import { readmeRouter } from "./readme";
+import { readmesRouter } from "./readmes";
 import { feedbackRouter } from "./feedback";
 import { historyRouter } from "./history";
 import { authRouter } from "./auth";
@@ -13,6 +14,7 @@ export function v1Router() {
   const router = Router();
   router.use("/analyze", analyzeRouter());
   router.use("/generate-readme", readmeRouter());
+  router.use("/readmes", readmesRouter());
   router.use("/auth", authRouter());
   router.use("/repos", reposRouter());
   router.use("/feedback", feedbackRouter());

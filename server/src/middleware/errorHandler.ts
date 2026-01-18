@@ -11,6 +11,7 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   const isHttpError = err instanceof HttpError;
   const statusCode = isHttpError ? err.statusCode : 500;
   const publicMessage = isHttpError ? err.publicMessage : "Unexpected server error.";
+  const details = isHttpError ? err.details : undefined;
 
   log.error(
     {
@@ -23,8 +24,19 @@ export const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
     "request_failed"
   );
 
+  // Only echo safe, non-sensitive metadata for rate-limit errors.
+  const safeDetails =
+    statusCode === 429 && details && typeof details === "object"
+      ? {
+          remaining: (details as Record<string, unknown>)["remaining"] ?? undefined,
+          resetsAt: (details as Record<string, unknown>)["resetsAt"] ?? undefined,
+          tier: (details as Record<string, unknown>)["tier"] ?? undefined
+        }
+      : undefined;
+
   res.status(statusCode).json({
     success: false,
-    error: publicMessage
+    error: publicMessage,
+    ...(safeDetails ? { details: safeDetails } : {})
   });
 };

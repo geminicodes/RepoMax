@@ -1,7 +1,11 @@
 import { createContext, useContext, useState, ReactNode } from 'react';
 import type { AnalysisResult as SharedAnalysisResult, ToneAnalysis } from "@readyrepo/shared";
-import type { AnalysisResult, Gap, Recommendation, Strength } from '@/types/analysis';
+import type { AnalysisResult } from '@/types/analysis';
 import { authFetch } from "@/services/authFetch";
+import { mapAnalyzeResponseToClient } from "@/services/analysisMapper";
+import { emitUsageUpdate } from "@/hooks/use-rate-limit";
+import { setAnalysisUsage } from "@/lib/rateLimit";
+import { auth } from "@/config/firebase";
 
 interface AnalysisContextType {
   isAnalyzing: boolean;
@@ -21,64 +25,7 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return Boolean(v) && typeof v === "object" && !Array.isArray(v);
 }
 
-function toClientStrengths(items: string[]): Strength[] {
-  return items.map((point) => ({ point, evidence: "" }));
-}
-
-function toClientGaps(items: string[]): Gap[] {
-  return items.map((gap) => ({ gap, impact: "medium", suggestion: "" }));
-}
-
-function toClientRecommendations(items: string[]): Recommendation[] {
-  return items.map((action) => ({ action, priority: "medium", timeEstimate: "" }));
-}
-
-function mapServerToClient(params: {
-  id: string;
-  githubUsername: string;
-  jobUrl: string;
-  jobTitle: string;
-  analysis: SharedAnalysisResult;
-  tone: ToneAnalysis;
-}): AnalysisResult {
-  const { id, githubUsername, jobUrl, jobTitle, analysis, tone } = params;
-  const analyzedAt = tone?.analysisMetadata?.analyzedAt ?? new Date().toISOString();
-
-  return {
-    id,
-    githubUsername,
-    githubAvatar: githubUsername ? `https://github.com/${githubUsername}.png` : "",
-    jobTitle,
-    jobCompany: "",
-    jobUrl,
-    analyzedAt,
-    overallScore: analysis.overallScore,
-    breakdown: {
-      technicalSkills: analysis.scoreBreakdown.technicalSkillsMatch,
-      experienceAlignment: analysis.scoreBreakdown.experienceAlignment,
-      projectRelevance: analysis.scoreBreakdown.projectRelevance,
-    },
-    strengths: toClientStrengths(analysis.strengths ?? []),
-    gaps: toClientGaps(analysis.gaps ?? []),
-    recommendations: toClientRecommendations(analysis.recommendations ?? []),
-    repositories: (analysis.repoScores ?? [])
-      .filter((r) => Boolean(r.repoFullName))
-      .map((r) => ({
-        name: r.repoFullName ?? "unknown",
-        url: r.repoFullName ? `https://github.com/${r.repoFullName}` : "",
-        description: "",
-        relevanceScore: Number(r.score ?? 0),
-        languages: [],
-        stars: 0,
-        forks: 0,
-        lastUpdated: "",
-        whyItMatters: (r.notes ?? []).join(" "),
-        highlights: r.notes ?? [],
-        improvements: [],
-        readmeGenerated: false,
-      })),
-  };
-}
+// (mapping moved to `services/analysisMapper.ts` so Results can reuse it)
 
 export function AnalysisProvider({ children }: { children: ReactNode }) {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -116,6 +63,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
       if (!res.ok) {
         // Never surface raw backend error text (could include sensitive details).
         if (res.status === 401) throw new Error("Your session expired. Please sign in again.");
+        if (res.status === 429) throw new Error("Monthly limit reached. Upgrade to Pro for unlimited analyses.");
         throw new Error("Analysis failed. Please try again.");
       }
 
@@ -123,6 +71,7 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
       const analysis = isRecord(data) ? (data["analysisResult"] as SharedAnalysisResult) : null;
       const tone = isRecord(data) ? (data["toneAnalysis"] as ToneAnalysis) : null;
       const analysisId = isRecord(data) ? (data["analysisId"] as unknown) : null;
+      const rateLimit = isRecord(data) ? (data["rateLimit"] as unknown) : null;
 
       if (!analysis || !tone) throw new Error("invalid-response");
 
@@ -131,7 +80,17 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
           ? analysisId
           : `local-${Date.now()}`;
 
-      const result = mapServerToClient({
+      // Sync local rate-limit UI with backend when possible (free-tier only).
+      if (isRecord(rateLimit) && rateLimit["tier"] === "free") {
+        const remaining = typeof rateLimit["remaining"] === "number" ? rateLimit["remaining"] : null;
+        if (typeof remaining === "number" && Number.isFinite(remaining)) {
+          const used = Math.max(0, Math.min(3, 3 - Math.floor(remaining)));
+          setAnalysisUsage(auth.currentUser?.uid ?? null, used);
+          emitUsageUpdate();
+        }
+      }
+
+      const result = mapAnalyzeResponseToClient({
         id,
         githubUsername: username,
         jobUrl,

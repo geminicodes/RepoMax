@@ -10,7 +10,7 @@ import { ToneFilter } from '@/components/shared/ToneFilter';
 import { SortSelect, SortOption } from '@/components/shared/SortSelect';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ProUpgradeBanner } from '@/components/shared/ProUpgradeBanner';
-import { fetchUserREADMEs } from '@/services/historyService';
+import { fetchUserREADMEsPage } from '@/services/historyService';
 import { SavedREADME } from '@/types/history';
 import { toast } from '@/hooks/use-toast';
 import { useDebounce } from '@/hooks/use-debounce';
@@ -18,9 +18,11 @@ import { useDebounce } from '@/hooks/use-debounce';
 export default function READMELibrary() {
   const [readmes, setReadmes] = useState<SavedREADME[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedReadme, setSelectedReadme] = useState<SavedREADME | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [cursor, setCursor] = useState<string | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,8 +40,9 @@ export default function READMELibrary() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchUserREADMEs(50);
-      setReadmes(data);
+      const page = await fetchUserREADMEsPage({ limit: 12, cursor: null });
+      setReadmes(page.items);
+      setCursor(page.nextCursor);
     } catch (err) {
       setError('Failed to load README library');
       toast({
@@ -49,6 +52,31 @@ export default function READMELibrary() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (!cursor || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const page = await fetchUserREADMEsPage({ limit: 12, cursor });
+      setReadmes((prev) => {
+        const seen = new Set(prev.map((r) => r.id));
+        const next = [...prev];
+        for (const item of page.items) {
+          if (!seen.has(item.id)) next.push(item);
+        }
+        return next;
+      });
+      setCursor(page.nextCursor);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Couldn’t load more READMEs. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -246,6 +274,18 @@ export default function READMELibrary() {
               ))}
             </motion.div>
           )}
+
+          {!isLoading && !error && filteredAndSortedReadmes.length > 0 && cursor ? (
+            <div className="pt-6 flex justify-center">
+              <button
+                onClick={loadMore}
+                disabled={isLoadingMore}
+                className="text-primary hover:underline disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {isLoadingMore ? "Loading..." : "Load more"}
+              </button>
+            </div>
+          ) : null}
         </div>
       </div>
 

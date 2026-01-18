@@ -19,7 +19,8 @@ function storageKey(uid?: string | null) {
 }
 
 export function getResetDate(d = new Date()) {
-  return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0);
+  // Match backend behavior (UTC month boundary).
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1, 0, 0, 0, 0));
 }
 
 export function getAnalysisUsage(uid?: string | null) {

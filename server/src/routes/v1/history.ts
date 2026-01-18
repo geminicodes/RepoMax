@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { authenticateUser } from "../../middleware/auth";
 import { HttpError } from "../../errors/httpError";
-import { getAnalysisById, getAnalysisHistory, getUserREADMEs } from "../../services/firestoreService";
+import { getAnalysisById, getAnalysisHistoryPage, getUserREADMEsPage } from "../../services/firestoreService";
 
 /**
  * History endpoints (Pro tier only storage; reads require auth).
@@ -14,8 +14,12 @@ export function historyRouter() {
   router.get("/", authenticateUser, async (req, res, next) => {
     try {
       const user = req.user!;
-      const items = await getAnalysisHistory(user.uid, 10);
-      res.json({ success: true, data: { analyses: items } });
+      const { items, nextCursor } = await getAnalysisHistoryPage({
+        userId: user.uid,
+        limit: req.query.limit,
+        cursor: req.query.cursor
+      });
+      res.json({ success: true, data: { analyses: items, nextCursor } });
     } catch (err) {
       next(err);
     }
@@ -44,8 +48,12 @@ export function historyRouter() {
   router.get("/readmes", authenticateUser, async (req, res, next) => {
     try {
       const user = req.user!;
-      const items = await getUserREADMEs(user.uid, 20);
-      res.json({ success: true, data: { readmes: items } });
+      const { items, nextCursor } = await getUserREADMEsPage({
+        userId: user.uid,
+        limit: req.query.limit,
+        cursor: req.query.cursor
+      });
+      res.json({ success: true, data: { readmes: items, nextCursor } });
     } catch (err) {
       next(err);
     }

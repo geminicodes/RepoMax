@@ -86,34 +86,49 @@ function toSavedREADME(item: unknown): SavedREADME | null {
   };
 }
 
-export async function fetchAnalysisHistory(limit: number = 10): Promise<HistoryAnalysis[]> {
-  // Prefer API when available; fall back to mock data for local/demo environments.
+type PageResult<T> = { items: T[]; nextCursor: string | null };
+
+function asCursor(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v : null;
+}
+
+export async function fetchAnalysisHistoryPage(params: {
+  limit?: number;
+  cursor?: string | null;
+}): Promise<PageResult<HistoryAnalysis>> {
+  const limit = Math.max(1, Math.min(50, Math.floor(params.limit ?? 10)));
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (params.cursor) qs.set("cursor", params.cursor);
+
   try {
-    const response = await authFetch(`${API_URL}/history`);
-    if (response.ok) {
-      const json = await response.json();
-      const maybeData = isRecord(json) ? (json['data'] as unknown) : null;
-      const analysesRaw =
-        isRecord(maybeData) && Array.isArray(maybeData['analyses'])
-          ? (maybeData['analyses'] as unknown[])
-          : Array.isArray(maybeData)
-            ? maybeData
-            : Array.isArray(json)
-              ? (json as unknown[])
-              : [];
+    const response = await authFetch(`${API_URL}/history?${qs.toString()}`);
+    if (!response.ok) throw new Error("history-fetch-failed");
 
-      const mapped = analysesRaw
-        .map(toHistoryAnalysis)
-        .filter((x): x is HistoryAnalysis => Boolean(x && x.id));
+    const json = (await response.json().catch(() => null)) as unknown;
+    const maybeData = isRecord(json) ? (json['data'] as unknown) : null;
+    const analysesRaw =
+      isRecord(maybeData) && Array.isArray(maybeData['analyses'])
+        ? (maybeData['analyses'] as unknown[])
+        : [];
 
-      return mapped.slice(0, limit);
-    }
+    const mapped = analysesRaw
+      .map(toHistoryAnalysis)
+      .filter((x): x is HistoryAnalysis => Boolean(x && x.id));
+
+    const nextCursor = isRecord(maybeData) ? asCursor(maybeData["nextCursor"]) : null;
+    return { items: mapped, nextCursor };
   } catch {
     // ignore and fall back
   }
 
   await simulateDelay();
-  return mockHistoryData.slice(0, limit);
+  return { items: mockHistoryData.slice(0, limit), nextCursor: null };
+}
+
+export async function fetchAnalysisHistory(limit: number = 10): Promise<HistoryAnalysis[]> {
+  const page = await fetchAnalysisHistoryPage({ limit });
+  return page.items.slice(0, limit);
 }
 
 export async function fetchAnalysisById(id: string): Promise<HistoryAnalysis | null> {
@@ -134,33 +149,44 @@ export async function fetchAnalysisById(id: string): Promise<HistoryAnalysis | n
   return mockHistoryData.find(a => a.id === id) || null;
 }
 
-export async function fetchUserREADMEs(limit: number = 20): Promise<SavedREADME[]> {
+export async function fetchUserREADMEsPage(params: {
+  limit?: number;
+  cursor?: string | null;
+}): Promise<PageResult<SavedREADME>> {
+  const limit = Math.max(1, Math.min(50, Math.floor(params.limit ?? 20)));
+  const qs = new URLSearchParams();
+  qs.set("limit", String(limit));
+  if (params.cursor) qs.set("cursor", params.cursor);
+
   try {
-    const response = await authFetch(`${API_URL}/history/readmes`);
-    if (response.ok) {
-      const json = await response.json();
-      const maybeData = isRecord(json) ? (json['data'] as unknown) : null;
-      const readmesRaw =
-        isRecord(maybeData) && Array.isArray(maybeData['readmes'])
-          ? (maybeData['readmes'] as unknown[])
-          : Array.isArray(maybeData)
-            ? maybeData
-            : Array.isArray(json)
-              ? (json as unknown[])
-              : [];
+    // Prefer top-level endpoint; backend also supports `/history/readmes`.
+    const response = await authFetch(`${API_URL}/readmes?${qs.toString()}`);
+    if (!response.ok) throw new Error("readmes-fetch-failed");
 
-      const mapped = readmesRaw
-        .map(toSavedREADME)
-        .filter((x): x is SavedREADME => Boolean(x && x.id));
+    const json = (await response.json().catch(() => null)) as unknown;
+    const maybeData = isRecord(json) ? (json['data'] as unknown) : null;
+    const readmesRaw =
+      isRecord(maybeData) && Array.isArray(maybeData['readmes'])
+        ? (maybeData['readmes'] as unknown[])
+        : [];
 
-      return mapped.slice(0, limit);
-    }
+    const mapped = readmesRaw
+      .map(toSavedREADME)
+      .filter((x): x is SavedREADME => Boolean(x && x.id));
+
+    const nextCursor = isRecord(maybeData) ? asCursor(maybeData["nextCursor"]) : null;
+    return { items: mapped, nextCursor };
   } catch {
     // ignore and fall back
   }
 
   await simulateDelay();
-  return mockREADMEData.slice(0, limit);
+  return { items: mockREADMEData.slice(0, limit), nextCursor: null };
+}
+
+export async function fetchUserREADMEs(limit: number = 20): Promise<SavedREADME[]> {
+  const page = await fetchUserREADMEsPage({ limit });
+  return page.items.slice(0, limit);
 }
 
 export async function fetchREADMEById(id: string): Promise<SavedREADME | null> {
