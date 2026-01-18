@@ -33,13 +33,9 @@ export function authRouter() {
         );
       }
 
-      const rawAuth = req.header("authorization") ?? "";
-      const token = rawAuth.replace(/^\s*bearer\s+/i, "").trim() || null;
-
       res.json({
         success: true,
         data: {
-          token,
           user: {
             uid: user.uid,
             email: user.email,

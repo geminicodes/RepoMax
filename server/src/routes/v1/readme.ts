@@ -8,29 +8,39 @@ import { authenticateUser } from "../../middleware/auth";
 import { saveGeneratedREADME } from "../../services/firestoreService";
 import { analyzeJobTone } from "../../services/toneAnalyzer";
 
+function isHttpUrl(input: string): boolean {
+  try {
+    const u = new URL(input);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const repoSchema = z.object({
-  name: z.string().min(1),
-  fullName: z.string().min(1),
+  name: z.string().min(1).max(200),
+  fullName: z.string().min(1).max(200),
   htmlUrl: z.string().url(),
   description: z.string().nullable(),
-  languages: z.array(z.string()),
+  languages: z.array(z.string().min(1).max(50)).max(200),
   stars: z.number(),
   forks: z.number(),
   updatedAt: z.string(),
-  defaultBranch: z.string().min(1),
-  readme: z.string().nullable(),
-  topics: z.array(z.string())
+  defaultBranch: z.string().min(1).max(200),
+  // Cap README input size to avoid prompt abuse / memory spikes.
+  readme: z.string().max(200_000).nullable(),
+  topics: z.array(z.string().min(1).max(50)).max(100)
 });
 
 const jobSchema = z.object({
-  url: z.string().url(),
-  title: z.string().min(1),
+  url: z.string().url().refine(isHttpUrl, { message: "job.url must be http(s)." }),
+  title: z.string().min(1).max(200),
   company: z.string().nullable(),
-  description: z.string(),
-  requirements: z.array(z.string()),
-  skills: z.array(z.string()),
+  description: z.string().min(1).max(50_000),
+  requirements: z.array(z.string().min(1).max(500)).max(500),
+  skills: z.array(z.string().min(1).max(100)).max(500),
   experienceLevel: z.string().nullable(),
-  rawText: z.string()
+  rawText: z.string().max(200_000)
 });
 
 const generateReadmeSchema = z.object({

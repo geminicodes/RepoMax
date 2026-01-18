@@ -3,6 +3,22 @@ import { getEnv } from "../config/env";
 import { HttpError } from "../errors/httpError";
 import type { ToneAnalysis } from "@readyrepo/shared";
 
+function withTimeout<T>(p: Promise<T>, timeoutMs: number, label: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label}_timeout`)), timeoutMs);
+    p.then(
+      (v) => {
+        clearTimeout(t);
+        resolve(v);
+      },
+      (e) => {
+        clearTimeout(t);
+        reject(e);
+      }
+    );
+  });
+}
+
 export function formatToneContextForPrompt(tone: ToneAnalysis | null | undefined) {
   if (!tone) return "Tone analysis unavailable.";
   const keywords = tone.culturalSignals.keywords.join(", ") || "none";
@@ -30,8 +46,17 @@ export async function generateTextWithGemini(params: {
     }
   });
 
-  const result = await model.generateContent(params.prompt);
-  const text = result.response.text();
-  return text?.trim() ?? "";
+  try {
+    const result = await withTimeout(model.generateContent(params.prompt), env.GEMINI_TIMEOUT_MS, "gemini");
+    const text = result.response.text();
+    return text?.trim() ?? "";
+  } catch (err) {
+    throw new HttpError({
+      statusCode: 502,
+      publicMessage: "AI service request failed.",
+      internalMessage: "Gemini generateContent failed",
+      details: { message: String((err as Error)?.message ?? err) }
+    });
+  }
 }
 
