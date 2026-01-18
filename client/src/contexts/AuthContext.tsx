@@ -17,6 +17,9 @@ import { friendlyFirebaseAuthError } from "@/lib/firebaseAuthErrors";
 
 type Tier = "free" | "pro";
 
+const TOKEN_REFRESH_BUFFER_MS = 5 * 60_000; // refresh when <5 min remaining
+const MIN_FORCED_REFRESH_INTERVAL_MS = 60_000; // rate limit: max 1 forced refresh/min
+
 type AuthContextValue = {
   user: User | null;
   loading: boolean;
@@ -53,6 +56,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const tokenExpMsRef = useRef<number | null>(null);
   const refreshTimerRef = useRef<number | null>(null);
   const mountedRef = useRef(true);
+  const lastForcedRefreshAtMsRef = useRef(0);
+  const forcedRefreshInFlightRef = useRef<Promise<string | null> | null>(null);
 
   const clearRefreshTimer = useCallback(() => {
     if (refreshTimerRef.current) {
@@ -69,7 +74,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const target = Math.max(now + 30_000, expMs - 5 * 60_000);
     const delay = Math.max(1_000, target - now);
     refreshTimerRef.current = window.setTimeout(() => {
-      void auth.currentUser?.getIdToken(true).catch(() => undefined);
+      // Best-effort forced refresh; rate-limited below.
+      const u = auth.currentUser;
+      if (!u) return;
+      void (async () => {
+        const now2 = Date.now();
+        if (forcedRefreshInFlightRef.current) {
+          await forcedRefreshInFlightRef.current;
+          return;
+        }
+        if (now2 - lastForcedRefreshAtMsRef.current < MIN_FORCED_REFRESH_INTERVAL_MS) return;
+        lastForcedRefreshAtMsRef.current = now2;
+        forcedRefreshInFlightRef.current = u
+          .getIdToken(true)
+          .catch(() => null)
+          .finally(() => {
+            forcedRefreshInFlightRef.current = null;
+          });
+        await forcedRefreshInFlightRef.current;
+      })();
     }, delay);
   }, [clearRefreshTimer]);
 
@@ -122,6 +145,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       unsub();
     };
   }, [clearRefreshTimer, updateTokenState]);
+
+  const clearClientStorage = useCallback(() => {
+    // Requirement: clear storage on logout (best-effort; ignore browser restrictions).
+    try {
+      localStorage.clear();
+    } catch {
+      // no-op
+    }
+    try {
+      sessionStorage.clear();
+    } catch {
+      // no-op
+    }
+  }, []);
 
   const signUp: AuthContextValue["signUp"] = useCallback(async (email, password, displayName) => {
     setError(null);
@@ -185,6 +222,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut: AuthContextValue["signOut"] = useCallback(async () => {
     setError(null);
     try {
+      clearRefreshTimer();
+      tokenExpMsRef.current = null;
+      lastForcedRefreshAtMsRef.current = 0;
+      forcedRefreshInFlightRef.current = null;
+      if (mountedRef.current) {
+        setUser(null);
+        setIdToken(null);
+        setClaims(null);
+      }
+      clearClientStorage();
       await firebaseSignOut(auth);
       await trackEvent("sign_out");
     } catch (e) {
@@ -192,7 +239,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(msg);
       throw e;
     }
-  }, []);
+  }, [clearClientStorage, clearRefreshTimer]);
 
   const resetPassword: AuthContextValue["resetPassword"] = useCallback(async (email) => {
     setError(null);
@@ -212,9 +259,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const exp = tokenExpMsRef.current;
     const now = Date.now();
-    if (idToken && exp && exp - now > 30_000) return idToken;
-
     try {
+      // If we have a token that's valid beyond our buffer, reuse it.
+      if (idToken && exp && exp - now > TOKEN_REFRESH_BUFFER_MS) return idToken;
+
+      // If within buffer (or exp unknown), best-effort forced refresh (rate-limited).
+      const shouldForce = Boolean(exp && exp - now <= TOKEN_REFRESH_BUFFER_MS);
+      if (shouldForce) {
+        if (forcedRefreshInFlightRef.current) {
+          const t = await forcedRefreshInFlightRef.current;
+          if (t) {
+            if (mountedRef.current) setIdToken(t);
+            return t;
+          }
+        }
+
+        const now2 = Date.now();
+        if (now2 - lastForcedRefreshAtMsRef.current >= MIN_FORCED_REFRESH_INTERVAL_MS) {
+          lastForcedRefreshAtMsRef.current = now2;
+          forcedRefreshInFlightRef.current = firebaseUser
+            .getIdToken(true)
+            .catch(() => null)
+            .finally(() => {
+              forcedRefreshInFlightRef.current = null;
+            });
+          const t = await forcedRefreshInFlightRef.current;
+          if (t) {
+            if (mountedRef.current) setIdToken(t);
+            return t;
+          }
+        }
+      }
+
       const token = await firebaseUser.getIdToken();
       if (mountedRef.current) setIdToken(token);
       return token;
@@ -227,13 +303,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const firebaseUser = auth.currentUser;
     if (!firebaseUser) return null;
     try {
-      const token = await firebaseUser.getIdToken(true);
-      if (mountedRef.current) setIdToken(token);
+      if (forcedRefreshInFlightRef.current) {
+        const token = await forcedRefreshInFlightRef.current;
+        if (token && mountedRef.current) setIdToken(token);
+        return token;
+      }
+
+      const now = Date.now();
+      if (now - lastForcedRefreshAtMsRef.current < MIN_FORCED_REFRESH_INTERVAL_MS) {
+        const token = await firebaseUser.getIdToken().catch(() => null);
+        if (token && mountedRef.current) setIdToken(token);
+        return token;
+      }
+
+      lastForcedRefreshAtMsRef.current = now;
+      forcedRefreshInFlightRef.current = firebaseUser
+        .getIdToken(true)
+        .catch(() => null)
+        .finally(() => {
+          forcedRefreshInFlightRef.current = null;
+        });
+
+      const token = await forcedRefreshInFlightRef.current;
+      if (!token) return null;
+
+      // Update claims/exp/schedule based on the refreshed token.
+      const tokenResult = await getIdTokenResult(firebaseUser).catch(() => null);
+      if (mountedRef.current) {
+        setIdToken(token);
+        if (tokenResult?.claims) setClaims((tokenResult.claims ?? {}) as Record<string, unknown>);
+      }
+      tokenExpMsRef.current = tokenResult?.expirationTime
+        ? new Date(tokenResult.expirationTime).getTime()
+        : tokenExpMsRef.current;
+      if (tokenExpMsRef.current) scheduleRefresh(tokenExpMsRef.current);
+
       return token;
     } catch {
       return null;
     }
-  }, []);
+  }, [scheduleRefresh]);
 
   const tier = useMemo(() => computeTierFromClaims(claims), [claims]);
 

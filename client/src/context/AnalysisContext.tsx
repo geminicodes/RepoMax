@@ -114,8 +114,9 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
 
       const json = (await res.json().catch(() => null)) as unknown;
       if (!res.ok) {
-        const msg = isRecord(json) && typeof json["error"] === "string" ? String(json["error"]) : "Analysis failed.";
-        throw new Error(msg);
+        // Never surface raw backend error text (could include sensitive details).
+        if (res.status === 401) throw new Error("Your session expired. Please sign in again.");
+        throw new Error("Analysis failed. Please try again.");
       }
 
       const data = isRecord(json) ? (json["data"] as unknown) : null;

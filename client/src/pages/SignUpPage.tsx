@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import type { Location } from "react-router-dom";
 import { SignUpModal } from "@/components/auth/SignUpModal";
 import { useAuth } from "@/contexts/AuthContext";
+import { safeInternalRedirect } from "@/lib/safeRedirect";
 
 type LocationState = { from?: Location };
 
@@ -14,7 +15,8 @@ export default function SignUpPage() {
 
   const from = useMemo(() => {
     const state = location.state as LocationState | null;
-    return state?.from?.pathname ? `${state.from.pathname}${state.from.search ?? ""}` : "/analyze";
+    const raw = state?.from?.pathname ? `${state.from.pathname}${state.from.search ?? ""}` : null;
+    return safeInternalRedirect(raw, "/analyze");
   }, [location.state]);
 
   useEffect(() => {

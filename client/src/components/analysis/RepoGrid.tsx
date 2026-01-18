@@ -114,14 +114,6 @@ export function RepoGrid({ repositories }: RepoGridProps) {
 
   const apiBase = (import.meta.env.VITE_API_URL || "/api/v1").replace(/\/+$/, "");
 
-  const extractErrorMessage = (json: unknown, fallback: string) => {
-    if (json && typeof json === "object" && !Array.isArray(json)) {
-      const err = (json as Record<string, unknown>)["error"];
-      if (typeof err === "string" && err.trim()) return err;
-    }
-    return fallback;
-  };
-
   const extractRepoFromResponse = (json: unknown): GitHubRepo | null => {
     if (!json || typeof json !== "object" || Array.isArray(json)) return null;
     const data = (json as Record<string, unknown>)["data"];
@@ -161,7 +153,9 @@ export function RepoGrid({ repositories }: RepoGridProps) {
     const repoRes = await authFetch(`${apiBase}/repos/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(parsed.repo)}`);
     const repoJson = (await repoRes.json().catch(() => null)) as unknown;
     if (!repoRes.ok) {
-      throw new Error(extractErrorMessage(repoJson, "Failed to load repository."));
+      // Never surface raw backend error text (could include sensitive details).
+      if (repoRes.status === 401) throw new Error("Your session expired. Please sign in again.");
+      throw new Error("Failed to load repository.");
     }
     const repo = extractRepoFromResponse(repoJson);
     if (!repo) throw new Error("Invalid repo response.");
@@ -193,7 +187,9 @@ export function RepoGrid({ repositories }: RepoGridProps) {
     });
     const genJson = (await genRes.json().catch(() => null)) as unknown;
     if (!genRes.ok) {
-      throw new Error(extractErrorMessage(genJson, "README generation failed."));
+      // Never surface raw backend error text (could include sensitive details).
+      if (genRes.status === 401) throw new Error("Your session expired. Please sign in again.");
+      throw new Error("README generation failed.");
     }
     const generated = extractGeneratedReadme(genJson);
     if (!generated) throw new Error("Empty README generated.");
