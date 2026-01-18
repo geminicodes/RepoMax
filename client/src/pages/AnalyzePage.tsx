@@ -9,7 +9,7 @@ import { toast } from '@/hooks/use-toast';
 import { RateLimitBanner } from '@/components/shared/RateLimitBanner';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRateLimit, emitUsageUpdate } from '@/hooks/use-rate-limit';
-import { incrementAnalysisUsage } from '@/lib/rateLimit';
+import { setAnalysisUsage } from '@/lib/rateLimit';
 import { trackEvent } from '@/config/firebase';
 import { useAnalysis } from '@/context/AnalysisContext';
 
@@ -80,22 +80,24 @@ const AnalyzePage = () => {
     try {
       await trackEvent("analysis_started", { uid: user?.uid ?? "anon", tier });
 
-      if (tier === "free") {
-        incrementAnalysisUsage(user?.uid ?? null);
-        emitUsageUpdate();
-      }
-
       // Persist job details for the API call performed by AnalysisContext.
       setLastJob({ jobUrl, jobTitle, description });
 
       const analysisId = await startAnalysis(username.trim(), jobUrl.trim());
       navigate(`/results/${encodeURIComponent(analysisId)}`);
     } catch (error) {
+      // If server tells us we're rate-limited, sync local banner/disable logic.
+      const message = error instanceof Error ? error.message : "";
+      if (tier === "free" && user?.uid && /monthly limit reached/i.test(message)) {
+        setAnalysisUsage(user.uid, 3);
+        emitUsageUpdate();
+      }
       toast({
         title: "Analysis Failed",
-        description: error instanceof Error ? error.message : "Something went wrong. Please try again.",
+        description: message || "Something went wrong. Please try again.",
         variant: "destructive",
       });
+      if (/monthly limit reached/i.test(message)) navigate("/upgrade");
       setIsLoading(false);
     }
   };

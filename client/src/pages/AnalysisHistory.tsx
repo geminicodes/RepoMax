@@ -10,14 +10,16 @@ import { ScoreRangeFilter } from '@/components/shared/ScoreRangeFilter';
 import { SortSelect, SortOption } from '@/components/shared/SortSelect';
 import { EmptyState } from '@/components/shared/EmptyState';
 import { ProUpgradeBanner } from '@/components/shared/ProUpgradeBanner';
-import { fetchAnalysisHistory } from '@/services/historyService';
+import { fetchAnalysisHistoryPage } from '@/services/historyService';
 import { HistoryAnalysis } from '@/types/history';
 import { toast } from '@/hooks/use-toast';
 
 export default function AnalysisHistory() {
   const [analyses, setAnalyses] = useState<HistoryAnalysis[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cursor, setCursor] = useState<string | null>(null);
 
   // Filters
   const [dateRange, setDateRange] = useState<DateRangePreset>('all');
@@ -33,8 +35,9 @@ export default function AnalysisHistory() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchAnalysisHistory(50);
-      setAnalyses(data);
+      const page = await fetchAnalysisHistoryPage({ limit: 10, cursor: null });
+      setAnalyses(page.items);
+      setCursor(page.nextCursor);
     } catch (err) {
       setError('Failed to load analysis history');
       toast({
@@ -44,6 +47,31 @@ export default function AnalysisHistory() {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadMore = async () => {
+    if (!cursor || isLoadingMore) return;
+    setIsLoadingMore(true);
+    try {
+      const page = await fetchAnalysisHistoryPage({ limit: 10, cursor });
+      setAnalyses((prev) => {
+        const seen = new Set(prev.map((a) => a.id));
+        const next = [...prev];
+        for (const item of page.items) {
+          if (!seen.has(item.id)) next.push(item);
+        }
+        return next;
+      });
+      setCursor(page.nextCursor);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Couldn’t load more history. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -209,9 +237,18 @@ export default function AnalysisHistory() {
               )
             ) : (
               // Analysis cards
-              filteredAndSortedAnalyses.map((analysis, index) => (
-                <AnalysisCard key={analysis.id} analysis={analysis} index={index} />
-              ))
+              <>
+                {filteredAndSortedAnalyses.map((analysis, index) => (
+                  <AnalysisCard key={analysis.id} analysis={analysis} index={index} />
+                ))}
+                {cursor ? (
+                  <div className="pt-2 flex justify-center">
+                    <Button variant="outline" onClick={loadMore} disabled={isLoadingMore}>
+                      {isLoadingMore ? "Loading..." : "Load more"}
+                    </Button>
+                  </div>
+                ) : null}
+              </>
             )}
           </div>
 

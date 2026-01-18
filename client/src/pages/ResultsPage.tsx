@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { useParams } from "react-router-dom";
 import { motion } from 'framer-motion';
 import { ArrowLeft, Download, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,11 +12,90 @@ import { FeedbackCTA } from '@/components/analysis/FeedbackCTA';
 import { FeedbackModal } from '@/components/analysis/FeedbackModal';
 import { toast } from '@/hooks/use-toast';
 import { useAnalysis } from "@/context/AnalysisContext";
+import { authFetch } from "@/services/authFetch";
+import { mapStoredAnalysisDocToClient } from "@/services/analysisMapper";
 
 const ResultsPage = () => {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const { analysisId } = useParams<{ analysisId: string }>();
   
-  const { analysisResult: result } = useAnalysis();
+  const { analysisResult: result, setAnalysisResult } = useAnalysis();
+
+  const needsFetch = useMemo(() => {
+    if (!analysisId) return false;
+    if (analysisId.startsWith("local-")) return false;
+    return !result || result.id !== analysisId;
+  }, [analysisId, result]);
+
+  useEffect(() => {
+    if (!needsFetch || !analysisId) return;
+    let cancelled = false;
+
+    void (async () => {
+      setLoading(true);
+      setLoadError(null);
+      try {
+        const base = (import.meta.env.VITE_API_URL || "/api/v1").replace(/\/+$/, "");
+        const res = await authFetch(`${base}/history/analysis/${encodeURIComponent(analysisId)}`);
+        const json = (await res.json().catch(() => null)) as unknown;
+        if (!res.ok) {
+          if (res.status === 404) throw new Error("Analysis not found.");
+          if (res.status === 401) throw new Error("Your session expired. Please sign in again.");
+          throw new Error("Failed to load analysis.");
+        }
+
+        const data =
+          json && typeof json === "object" && !Array.isArray(json)
+            ? (json as Record<string, unknown>)["data"]
+            : null;
+        const analysisRaw =
+          data && typeof data === "object" && !Array.isArray(data)
+            ? (data as Record<string, unknown>)["analysis"]
+            : null;
+
+        const mapped = mapStoredAnalysisDocToClient(analysisRaw);
+        if (!mapped) throw new Error("Invalid analysis response.");
+
+        if (!cancelled) setAnalysisResult(mapped);
+      } catch (e) {
+        if (!cancelled) setLoadError(e instanceof Error ? e.message : "Failed to load analysis.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [analysisId, needsFetch, setAnalysisResult]);
+
+  if (!result && (loading || loadError)) {
+    return (
+      <div className="min-h-screen bg-background relative">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <div className="glass rounded-2xl p-8 text-center">
+            {loading ? (
+              <>
+                <h1 className="font-display text-2xl font-bold mb-2">Loading analysis…</h1>
+                <p className="text-muted-foreground">Fetching your saved result.</p>
+              </>
+            ) : (
+              <>
+                <h1 className="font-display text-2xl font-bold mb-2">Couldn’t load analysis</h1>
+                <p className="text-muted-foreground mb-6">{loadError}</p>
+                <Link to="/history">
+                  <Button variant="outline">Back to history</Button>
+                </Link>
+              </>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (!result) {
     return (
       <div className="min-h-screen bg-background relative">
