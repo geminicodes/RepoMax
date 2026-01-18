@@ -8,11 +8,21 @@ const toneAnalyzer_1 = require("../../services/toneAnalyzer");
 const auth_1 = require("../../middleware/auth");
 const userService_1 = require("../../services/userService");
 const firestoreService_1 = require("../../services/firestoreService");
+function isHttpUrl(input) {
+    try {
+        const u = new URL(input);
+        return u.protocol === "http:" || u.protocol === "https:";
+    }
+    catch {
+        return false;
+    }
+}
 const schema = zod_1.z.object({
-    githubUsername: zod_1.z.string().min(1),
-    jobUrl: zod_1.z.string().url(),
-    jobTitle: zod_1.z.string().min(1),
-    description: zod_1.z.string().min(1),
+    githubUsername: zod_1.z.string().min(1).max(100),
+    jobUrl: zod_1.z.string().url().refine(isHttpUrl, { message: "jobUrl must be http(s)." }),
+    jobTitle: zod_1.z.string().min(1).max(200),
+    // Prevent prompt/compute abuse.
+    description: zod_1.z.string().min(1).max(50_000),
     isPublic: zod_1.z.boolean().optional()
 });
 /**
@@ -35,7 +45,7 @@ function analyzeRouter() {
                 }));
             }
             const user = req.user;
-            const rate = await (0, userService_1.checkUserRateLimit)(user.uid);
+            const rate = await (0, userService_1.consumeAnalysisQuota)(user.uid);
             if (!rate.allowed) {
                 return next(new httpError_1.HttpError({
                     statusCode: 429,
@@ -44,6 +54,8 @@ function analyzeRouter() {
                     details: rate
                 }));
             }
+            // Use tier from the quota transaction to avoid brief cache inconsistencies.
+            const effectiveTier = rate.tier;
             const tone = await (0, toneAnalyzer_1.analyzeJobTone)(parsed.data.description, parsed.data.jobUrl, req.log);
             // NOTE: In this trimmed build, the "analysis engine" isn't implemented yet.
             // Persist the expected shape with conservative defaults so history works.
@@ -61,7 +73,7 @@ function analyzeRouter() {
             };
             let analysisId = null;
             // Tier behavior: Free = 3/month, no history. Pro = unlimited + history.
-            if (user.tier === "pro") {
+            if (effectiveTier === "pro") {
                 const saved = await (0, firestoreService_1.saveAnalysis)({
                     userId: user.uid,
                     githubUsername: parsed.data.githubUsername,
@@ -72,9 +84,6 @@ function analyzeRouter() {
                     isPublic: Boolean(parsed.data.isPublic ?? false)
                 });
                 analysisId = saved.analysisId;
-            }
-            else {
-                await (0, userService_1.incrementAnalysisCount)(user.uid);
             }
             res.json({
                 success: true,

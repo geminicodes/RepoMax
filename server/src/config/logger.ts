@@ -8,6 +8,10 @@ export function createLogger() {
   return pino({
     level: process.env.LOG_LEVEL ?? "info",
     base: { service: "readyrepo-server" },
+    redact: {
+      paths: ["req.headers.authorization", "req.headers.cookie"],
+      remove: true
+    },
     transport: isProd
       ? undefined
       : {

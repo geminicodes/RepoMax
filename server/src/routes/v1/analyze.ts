@@ -3,15 +3,25 @@ import { z } from "zod";
 import { HttpError } from "../../errors/httpError";
 import { analyzeJobTone } from "../../services/toneAnalyzer";
 import { authenticateUser } from "../../middleware/auth";
-import { checkUserRateLimit, incrementAnalysisCount } from "../../services/userService";
+import { consumeAnalysisQuota } from "../../services/userService";
 import { saveAnalysis } from "../../services/firestoreService";
 import type { AnalysisResult } from "@readyrepo/shared";
 
+function isHttpUrl(input: string): boolean {
+  try {
+    const u = new URL(input);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const schema = z.object({
-  githubUsername: z.string().min(1),
-  jobUrl: z.string().url(),
-  jobTitle: z.string().min(1),
-  description: z.string().min(1),
+  githubUsername: z.string().min(1).max(100),
+  jobUrl: z.string().url().refine(isHttpUrl, { message: "jobUrl must be http(s)." }),
+  jobTitle: z.string().min(1).max(200),
+  // Prevent prompt/compute abuse.
+  description: z.string().min(1).max(50_000),
   isPublic: z.boolean().optional()
 });
 
@@ -40,7 +50,7 @@ export function analyzeRouter() {
 
       const user = req.user!;
 
-      const rate = await checkUserRateLimit(user.uid);
+      const rate = await consumeAnalysisQuota(user.uid);
       if (!rate.allowed) {
         return next(
           new HttpError({
@@ -51,6 +61,9 @@ export function analyzeRouter() {
           })
         );
       }
+
+      // Use tier from the quota transaction to avoid brief cache inconsistencies.
+      const effectiveTier = rate.tier;
 
       const tone = await analyzeJobTone(parsed.data.description, parsed.data.jobUrl, req.log);
 
@@ -72,7 +85,7 @@ export function analyzeRouter() {
       let analysisId: string | null = null;
 
       // Tier behavior: Free = 3/month, no history. Pro = unlimited + history.
-      if (user.tier === "pro") {
+      if (effectiveTier === "pro") {
         const saved = await saveAnalysis({
           userId: user.uid,
           githubUsername: parsed.data.githubUsername,
@@ -83,8 +96,6 @@ export function analyzeRouter() {
           isPublic: Boolean(parsed.data.isPublic ?? false)
         });
         analysisId = saved.analysisId;
-      } else {
-        await incrementAnalysisCount(user.uid);
       }
 
       res.json({

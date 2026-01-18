@@ -108,6 +108,76 @@ export async function checkUserRateLimit(uid: string): Promise<{
   });
 }
 
+/**
+ * Atomically check and (if allowed) consume a free-tier analysis credit.
+ *
+ * This prevents race conditions where concurrent requests both pass a "check"
+ * and then increment the counter outside the transaction.
+ */
+export async function consumeAnalysisQuota(uid: string): Promise<{
+  allowed: boolean;
+  remaining: number; // -1 for unlimited
+  resetsAt: string; // ISO
+  tier: UserTier;
+}> {
+  const db = getFirestore();
+  const ref = db.collection("users").doc(uid);
+
+  return await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    const now = new Date();
+
+    // If the user doc is missing for any reason, create a conservative baseline.
+    if (!snap.exists) {
+      const reset = getNextMonthStart(now).toISOString();
+      const doc: UserDoc = {
+        email: null,
+        displayName: null,
+        photoURL: null,
+        tier: "free",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        analysisCount: 0,
+        analysisResetDate: reset,
+        preferences: {}
+      };
+      tx.set(ref, doc, { merge: true });
+    }
+
+    const data = snap.exists ? snap.data() : undefined;
+    const tier = (data?.tier as UserTier | undefined) ?? "free";
+    if (tier === "pro") {
+      return { allowed: true, remaining: -1, resetsAt: getNextMonthStart(now).toISOString(), tier: "pro" };
+    }
+
+    const resetIso = String(data?.analysisResetDate ?? "");
+    const resetDate = resetIso ? new Date(resetIso) : getNextMonthStart(now);
+    let currentCount = Number(data?.analysisCount ?? 0);
+
+    // Reset if missing/invalid or crossed.
+    if (!resetIso || Number.isNaN(resetDate.getTime()) || now >= resetDate) {
+      const nextReset = getNextMonthStart(now).toISOString();
+      currentCount = 0;
+      tx.set(ref, { analysisCount: 0, analysisResetDate: nextReset }, { merge: true });
+    }
+
+    if (currentCount >= 3) {
+      const resetsAt = Number.isNaN(resetDate.getTime())
+        ? getNextMonthStart(now).toISOString()
+        : resetDate.toISOString();
+      return { allowed: false, remaining: 0, resetsAt, tier: "free" };
+    }
+
+    const nextCount = currentCount + 1;
+    tx.set(ref, { analysisCount: nextCount }, { merge: true });
+
+    const resetsAt = (!resetIso || Number.isNaN(resetDate.getTime()) || now >= resetDate)
+      ? getNextMonthStart(now).toISOString()
+      : resetDate.toISOString();
+
+    return { allowed: true, remaining: Math.max(0, 3 - nextCount), resetsAt, tier: "free" };
+  });
+}
+
 export async function incrementAnalysisCount(uid: string) {
   const db = getFirestore();
   const ref = db.collection("users").doc(uid);
