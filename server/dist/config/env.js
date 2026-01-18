@@ -32,6 +32,7 @@ const envSchema = zod_1.z.object({
     FIREBASE_SERVICE_ACCOUNT_JSON: zod_1.z.string().min(1).optional(),
     GEMINI_API_KEY: zod_1.z.string().min(1).optional(),
     GEMINI_MODEL: zod_1.z.string().min(1).default("gemini-1.5-flash"),
+    GEMINI_TIMEOUT_MS: numberFromString.default("30000"),
     STARTUP_CHECKS_ENABLED: boolFromString.default("true"),
     TONE_CACHE_TTL_HOURS: numberFromString.optional(),
     // Optional: server-side GA Measurement Protocol
