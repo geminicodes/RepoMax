@@ -15,8 +15,12 @@ function historyRouter() {
     router.get("/", auth_1.authenticateUser, async (req, res, next) => {
         try {
             const user = req.user;
-            const items = await (0, firestoreService_1.getAnalysisHistory)(user.uid, 10);
-            res.json({ success: true, data: { analyses: items } });
+            const { items, nextCursor } = await (0, firestoreService_1.getAnalysisHistoryPage)({
+                userId: user.uid,
+                limit: req.query.limit,
+                cursor: req.query.cursor
+            });
+            res.json({ success: true, data: { analyses: items, nextCursor } });
         }
         catch (err) {
             next(err);
@@ -43,8 +47,12 @@ function historyRouter() {
     router.get("/readmes", auth_1.authenticateUser, async (req, res, next) => {
         try {
             const user = req.user;
-            const items = await (0, firestoreService_1.getUserREADMEs)(user.uid, 20);
-            res.json({ success: true, data: { readmes: items } });
+            const { items, nextCursor } = await (0, firestoreService_1.getUserREADMEsPage)({
+                userId: user.uid,
+                limit: req.query.limit,
+                cursor: req.query.cursor
+            });
+            res.json({ success: true, data: { readmes: items, nextCursor } });
         }
         catch (err) {
             next(err);

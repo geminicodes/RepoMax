@@ -2,10 +2,39 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.saveAnalysis = saveAnalysis;
 exports.getAnalysisHistory = getAnalysisHistory;
+exports.getAnalysisHistoryPage = getAnalysisHistoryPage;
 exports.getAnalysisById = getAnalysisById;
 exports.saveGeneratedREADME = saveGeneratedREADME;
 exports.getUserREADMEs = getUserREADMEs;
+exports.getUserREADMEsPage = getUserREADMEsPage;
 const firebase_1 = require("../config/firebase");
+function clampInt(input, opts) {
+    const n = typeof input === "string" ? Number(input) : typeof input === "number" ? input : NaN;
+    if (!Number.isFinite(n))
+        return opts.fallback;
+    const v = Math.floor(n);
+    return Math.max(opts.min, Math.min(opts.max, v));
+}
+function toIsoIfTimestamp(v) {
+    // Firestore Timestamp has `toDate()`; admin Timestamp also supports it.
+    if (v && typeof v === "object" && typeof v.toDate === "function") {
+        try {
+            return v.toDate().toISOString();
+        }
+        catch {
+            return v;
+        }
+    }
+    return v;
+}
+function serializeDocData(data) {
+    // Shallow serialization of timestamps commonly returned by our docs.
+    const out = {};
+    for (const [k, v] of Object.entries(data)) {
+        out[k] = toIsoIfTimestamp(v);
+    }
+    return out;
+}
 async function saveAnalysis(params) {
     const db = (0, firebase_1.getFirestore)();
     const ref = await db.collection("analyses").add({
@@ -33,7 +62,27 @@ async function getAnalysisHistory(userId, limit = 10) {
         .orderBy("createdAt", "desc")
         .limit(limit)
         .get();
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    return snap.docs.map((d) => ({ id: d.id, ...serializeDocData(d.data()) }));
+}
+async function getAnalysisHistoryPage(params) {
+    const db = (0, firebase_1.getFirestore)();
+    const limit = clampInt(params.limit, { min: 1, max: 50, fallback: 10 });
+    let q = db
+        .collection("analyses")
+        .where("userId", "==", params.userId)
+        .orderBy("createdAt", "desc")
+        .limit(limit);
+    const cursor = typeof params.cursor === "string" && params.cursor.trim() ? params.cursor.trim() : null;
+    if (cursor) {
+        const cursorSnap = await db.collection("analyses").doc(cursor).get();
+        if (cursorSnap.exists) {
+            q = q.startAfter(cursorSnap);
+        }
+    }
+    const snap = await q.get();
+    const items = snap.docs.map((d) => ({ id: d.id, ...serializeDocData(d.data()) }));
+    const nextCursor = snap.docs.length === limit ? snap.docs[snap.docs.length - 1]?.id ?? null : null;
+    return { items, nextCursor };
 }
 async function getAnalysisById(analysisId, userId) {
     const db = (0, firebase_1.getFirestore)();
@@ -46,7 +95,7 @@ async function getAnalysisById(analysisId, userId) {
     const ownerId = data["userId"];
     if (typeof ownerId !== "string" || ownerId !== userId)
         return null;
-    return { id: snap.id, ...data };
+    return { id: snap.id, ...serializeDocData(data) };
 }
 async function saveGeneratedREADME(params) {
     const db = (0, firebase_1.getFirestore)();
@@ -73,6 +122,26 @@ async function getUserREADMEs(userId, limit = 20) {
         .orderBy("createdAt", "desc")
         .limit(limit)
         .get();
-    return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+    return snap.docs.map((d) => ({ id: d.id, ...serializeDocData(d.data()) }));
+}
+async function getUserREADMEsPage(params) {
+    const db = (0, firebase_1.getFirestore)();
+    const limit = clampInt(params.limit, { min: 1, max: 50, fallback: 20 });
+    let q = db
+        .collection("readmes")
+        .where("userId", "==", params.userId)
+        .orderBy("createdAt", "desc")
+        .limit(limit);
+    const cursor = typeof params.cursor === "string" && params.cursor.trim() ? params.cursor.trim() : null;
+    if (cursor) {
+        const cursorSnap = await db.collection("readmes").doc(cursor).get();
+        if (cursorSnap.exists) {
+            q = q.startAfter(cursorSnap);
+        }
+    }
+    const snap = await q.get();
+    const items = snap.docs.map((d) => ({ id: d.id, ...serializeDocData(d.data()) }));
+    const nextCursor = snap.docs.length === limit ? snap.docs[snap.docs.length - 1]?.id ?? null : null;
+    return { items, nextCursor };
 }
 //# sourceMappingURL=firestoreService.js.map
