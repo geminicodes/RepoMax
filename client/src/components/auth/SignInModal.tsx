@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { friendlyFirebaseAuthError } from "@/lib/firebaseAuthErrors";
 import { PasswordResetModal } from "@/components/auth/PasswordResetModal";
 import { useNavigate } from "react-router-dom";
+import { safeInternalRedirect } from "@/lib/safeRedirect";
 
 const LAST_EMAIL_KEY = "repomax:last_email";
 
@@ -68,7 +69,7 @@ export function SignInModal({
       description: "You’re signed in.",
     });
     if (onSignedIn) return onSignedIn();
-    if (redirectTo) navigate(redirectTo, { replace: true });
+    navigate(safeInternalRedirect(redirectTo, "/analyze"), { replace: true });
   };
 
   const persistEmail = (email: string) => {

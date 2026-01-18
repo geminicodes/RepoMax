@@ -13,6 +13,7 @@ import { toast } from "@/hooks/use-toast";
 import { friendlyFirebaseAuthError } from "@/lib/firebaseAuthErrors";
 import { getPasswordStrength } from "@/lib/passwordStrength";
 import { useNavigate } from "react-router-dom";
+import { safeInternalRedirect } from "@/lib/safeRedirect";
 
 const schema = z
   .object({
@@ -73,7 +74,7 @@ export function SignUpModal({
       title: "Welcome to RepoMax",
       description: "Your account is ready. Let’s analyze your profile.",
     });
-    navigate(redirectTo, { replace: true });
+    navigate(safeInternalRedirect(redirectTo, "/analyze"), { replace: true });
   };
 
   const onSubmit = async (values: FormValues) => {
