@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Github, Briefcase, Brain, BarChart3, Lightbulb, CheckCircle, Sparkles } from "lucide-react";
 
 const loadingSteps = [
@@ -24,69 +24,79 @@ const sampleRepos = [
 
 export function AnalysisLoading() {
   const [currentStep, setCurrentStep] = useState(0);
+  const reducedMotion = useReducedMotion();
 
   useEffect(() => {
+    if (reducedMotion) return;
     const interval = setInterval(() => {
       setCurrentStep((prev) => (prev + 1) % loadingSteps.length);
     }, 3000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [reducedMotion]);
 
   const CurrentIcon = loadingSteps[currentStep].icon;
 
   return (
     <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      initial={reducedMotion ? undefined : { opacity: 0 }}
+      animate={reducedMotion ? undefined : { opacity: 1 }}
+      exit={reducedMotion ? undefined : { opacity: 0 }}
       className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 backdrop-blur-xl"
     >
       {/* Background animated repos */}
-      <div className="absolute inset-0 overflow-hidden opacity-10 blur-sm">
-        <div className="absolute inset-0 flex flex-col gap-4 animate-scroll">
-          {[...sampleRepos, ...sampleRepos, ...sampleRepos].map((repo, index) => (
-            <motion.div
-              key={index}
-              initial={{ x: index % 2 === 0 ? -100 : 100, opacity: 0 }}
-              animate={{ x: 0, opacity: 0.5 }}
-              transition={{ delay: index * 0.1 }}
-              className={`text-2xl font-mono whitespace-nowrap ${index % 2 === 0 ? 'ml-20' : 'ml-40'}`}
-            >
-              📁 {repo}
-            </motion.div>
-          ))}
+      {!reducedMotion ? (
+        <div className="absolute inset-0 overflow-hidden opacity-10 blur-sm">
+          <div className="absolute inset-0 flex flex-col gap-4 animate-scroll">
+            {[...sampleRepos, ...sampleRepos, ...sampleRepos].map((repo, index) => (
+              <motion.div
+                key={index}
+                initial={{ x: index % 2 === 0 ? -100 : 100, opacity: 0 }}
+                animate={{ x: 0, opacity: 0.5 }}
+                transition={{ delay: index * 0.1 }}
+                className={`text-2xl font-mono whitespace-nowrap ${index % 2 === 0 ? 'ml-20' : 'ml-40'}`}
+              >
+                📁 {repo}
+              </motion.div>
+            ))}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {/* Main loading card */}
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
+        initial={reducedMotion ? undefined : { scale: 0.9, opacity: 0 }}
+        animate={reducedMotion ? undefined : { scale: 1, opacity: 1 }}
         className="relative glass rounded-3xl p-10 max-w-md mx-4 text-center animate-pulse-glow"
       >
         {/* Sparkles decoration */}
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
-          className="absolute -top-4 -right-4"
-        >
-          <Sparkles className="w-8 h-8 text-primary" />
-        </motion.div>
+        {!reducedMotion ? (
+          <motion.div
+            animate={{ rotate: 360 }}
+            transition={{ duration: 8, repeat: Infinity, ease: "linear" }}
+            className="absolute -top-4 -right-4"
+          >
+            <Sparkles className="w-8 h-8 text-primary" />
+          </motion.div>
+        ) : (
+          <div className="absolute -top-4 -right-4">
+            <Sparkles className="w-8 h-8 text-primary" />
+          </div>
+        )}
 
         {/* Animated spinner */}
         <div className="relative w-24 h-24 mx-auto mb-8">
           {/* Outer ring */}
           <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+            animate={reducedMotion ? undefined : { rotate: 360 }}
+            transition={reducedMotion ? undefined : { duration: 2, repeat: Infinity, ease: "linear" }}
             className="absolute inset-0 rounded-full border-4 border-primary/20 border-t-primary"
           />
           
           {/* Inner ring */}
           <motion.div
-            animate={{ rotate: -360 }}
-            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+            animate={reducedMotion ? undefined : { rotate: -360 }}
+            transition={reducedMotion ? undefined : { duration: 3, repeat: Infinity, ease: "linear" }}
             className="absolute inset-2 rounded-full border-4 border-secondary/20 border-b-secondary"
           />
           

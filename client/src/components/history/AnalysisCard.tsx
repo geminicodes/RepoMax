@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Calendar, Briefcase, Github, ChevronRight, Layers } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { HistoryAnalysis } from '@/types/history';
 
 interface AnalysisCardProps {
@@ -13,6 +14,7 @@ interface AnalysisCardProps {
 export function AnalysisCard({ analysis, index }: AnalysisCardProps) {
   const scoreColor = getScoreColor(analysis.overallScore);
   const scoreLabel = getScoreLabel(analysis.overallScore);
+  const avatarFallback = (analysis.githubUsername || "?").slice(0, 2).toUpperCase();
 
   return (
     <motion.div
@@ -147,11 +149,10 @@ export function AnalysisCard({ analysis, index }: AnalysisCardProps) {
         {/* Right side - User & Action */}
         <div className="flex flex-col items-end gap-2">
           <div className="flex items-center gap-2">
-            <img
-              src={analysis.githubAvatar}
-              alt={analysis.githubUsername}
-              className="w-8 h-8 rounded-full border border-border"
-            />
+            <Avatar className="h-8 w-8 border border-border">
+              <AvatarImage src={analysis.githubAvatar} alt={analysis.githubUsername || "GitHub avatar"} />
+              <AvatarFallback className="text-[10px] font-medium">{avatarFallback}</AvatarFallback>
+            </Avatar>
             <div className="text-right hidden sm:block">
               <p className="text-sm font-medium text-foreground flex items-center gap-1">
                 <Github className="w-3 h-3" />

@@ -1,11 +1,9 @@
-import { fileURLToPath } from "node:url";
+const path = require("node:path");
 
-const tailwindConfigPath = fileURLToPath(new URL("./tailwind.config.ts", import.meta.url));
-
-export default {
+module.exports = {
   plugins: {
     // Explicit path so Vite (running from /client) still loads root config.
-    tailwindcss: { config: tailwindConfigPath },
-    autoprefixer: {}
-  }
+    tailwindcss: { config: path.resolve(__dirname, "./tailwind.config.ts") },
+    autoprefixer: {},
+  },
 };
