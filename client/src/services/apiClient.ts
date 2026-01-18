@@ -32,7 +32,6 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, opt
     if (import.meta.env.DEV) {
       const ms = Math.round(performance.now() - start);
       // Avoid logging headers/bodies (tokens).
-      // eslint-disable-next-line no-console
       console.debug(`[api] ${method} ${String(input)} -> ${res.status} (${ms}ms)`);
     }
     return res;
@@ -43,7 +42,6 @@ async function fetchWithTimeout(input: RequestInfo | URL, init: RequestInit, opt
 
     if (import.meta.env.DEV) {
       const ms = Math.round(performance.now() - start);
-      // eslint-disable-next-line no-console
       console.warn(`[api] ${method} ${String(input)} failed (${ms}ms)`, err);
     }
 
